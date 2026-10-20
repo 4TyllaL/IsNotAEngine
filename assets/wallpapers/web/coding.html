@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="retint" content="#82aaff">
+<title>Coding</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #13161e; --line: #1e2230; --text: #c9d1e3; --dim: #4a5168;
+    --kw: #c792ea; --fn: #82aaff; --str: #c3e88d; --num: #f78c6c; --ty: #ffcb6b; --com: #546178; --mac: #89ddff; --cursor: #ffcc00;
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #090a0e; color: var(--text);
+    font-family: "Cascadia Code", "Cascadia Mono", Consolas, monospace; }
+  body { display: grid; place-items: center; }
+  .win { width: 84vw; height: 82vh; background: var(--bg); border: 1px solid var(--line); border-radius: 1.2vmin; overflow: hidden;
+    display: grid; grid-template-rows: auto auto 1fr 26%; box-shadow: 0 4vmin 10vmin rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.02); }
+  .title { display: flex; align-items: center; gap: .8vmin; padding: 1.2vmin 1.6vmin; background: var(--panel); border-bottom: 1px solid var(--line); font-family: "Segoe UI", sans-serif; font-size: 1.3vmin; color: var(--dim); }
+  .title i { width: 1.1vmin; height: 1.1vmin; border-radius: 50%; background: #2a2f3d; }
+  .title i:nth-child(1) { background: #ff5f57; } .title i:nth-child(2) { background: #febc2e; } .title i:nth-child(3) { background: #28c840; }
+  .title span { margin-left: auto; margin-right: auto; }
+  .tabs { display: flex; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 1.25vmin; }
+  .tab { padding: 1vmin 2vmin; color: var(--dim); border-right: 1px solid var(--line); display: flex; gap: .8vmin; align-items: center; }
+  .tab.on { background: var(--bg); color: var(--text); box-shadow: inset 0 2px 0 var(--cursor); }
+  .tab b { font-weight: 400; font-size: 1vmin; padding: .1vmin .5vmin; border-radius: .3vmin; color: #0f1117; }
+  .editor { position: relative; display: grid; grid-template-columns: 6vmin 1fr 9vmin; overflow: hidden; font-size: 1.55vmin; line-height: 2.45vmin; }
+  .gutter { color: var(--dim); text-align: right; padding: 1.2vmin 1.4vmin 0 0; white-space: pre; }
+  .code { padding: 1.2vmin 0 0 1vmin; white-space: pre; overflow: hidden; position: relative; }
+  .code .cur-line { position: absolute; left: 0; right: 0; height: 2.45vmin; background: rgba(255,255,255,.03); }
+  .caret { display: inline-block; width: .2vmin; height: 2vmin; background: var(--cursor); vertical-align: -0.35vmin; animation: blink 1s steps(1) infinite; }
+  .typing .caret { animation: none; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .minimap { border-left: 1px solid var(--line); padding: 1.2vmin .8vmin; overflow: hidden; }
+  .minimap div { height: .38vmin; margin-bottom: .22vmin; border-radius: .1vmin; opacity: .5; }
+  .kw { color: var(--kw); } .fn { color: var(--fn); } .str { color: var(--str); } .num { color: var(--num); }
+  .ty { color: var(--ty); } .com { color: var(--com); font-style: italic; } .mac { color: var(--mac); }
+  .term { border-top: 1px solid var(--line); background: #0c0e13; font-size: 1.35vmin; line-height: 2.1vmin; padding: 1vmin 1.6vmin; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+  .term .head { position: absolute; }
+  .term p { margin: 0; white-space: pre; }
+  .ok { color: #3ddc97; } .warn { color: #febc2e; } .info { color: #82aaff; } .muted { color: var(--dim); }
+  .status { display: flex; gap: 2vmin; position: fixed; bottom: calc(9vh - 3vmin); left: 8vw; right: 8vw; font-family: "Segoe UI", sans-serif; font-size: 1.2vmin; color: var(--dim); }
+  .status span:last-child { margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="win">
+  <div class="title"><i></i><i></i><i></i><span id="wtitle">isnotaengine — Code</span></div>
+  <div class="tabs" id="tabs"></div>
+  <div class="editor">
+    <div class="gutter" id="gutter"></div>
+    <div class="code" id="code"></div>
+    <div class="minimap" id="minimap"></div>
+  </div>
+  <div class="term" id="term"></div>
+</div>
+<div class="status"><span id="branch">⎇ main</span><span id="pos">Ln 1, Col 1</span><span id="clock"></span></div>
+<script>
+const FILES = [
+  { name: 'engine.rs', lang: 'rs', color: '#f78c6c', code:
+`//! Orquestrador central: eventos, monitores e loop de frames.
+use std::time::{Duration, Instant};
+
+pub struct Engine {
+    viewports: Vec<Viewport>,
+    start: Instant,
+    paused: bool,
+}
+
+impl Engine {
+    pub fn run(&mut self) -> Result<()> {
+        let frame = Duration::from_secs_f32(1.0 / 60.0);
+        loop {
+            self.pump_messages()?;
+            if self.paused {
+                std::thread::sleep(frame);
+                continue;
+            }
+            let t = self.start.elapsed().as_secs_f32();
+            for v in &self.viewports {
+                v.render(t)?;
+            }
+        }
+    }
+}` },
+  { name: 'aurora.hlsl', lang: 'hlsl', color: '#c792ea', code:
+`// Aurora boreal sobre montanhas, refletida em um lago.
+float3 aurora(float2 p)
+{
+    float t = T() * 0.06;
+    float3 acc = 0.0.xxx;
+    for (int i = 0; i < 16; i++)
+    {
+        float fi = (float)i / 16.0;
+        float bottom = fi * 0.05 + 0.12 * sin(p.x * 1.6 + t * 4.0);
+        float dy = p.y - bottom;
+        float glow = exp(-max(dy, 0.0) * 9.0);
+        acc += lerp(green, violet, dy * 2.5) * glow;
+    }
+    return acc * 0.11;
+}` },
+  { name: 'studio.ts', lang: 'ts', color: '#82aaff', code:
+`// Prévia ao vivo: busca frames renderizados pelo motor.
+async function drawFrame(canvas: HTMLCanvasElement, id: string, t: number) {
+  const { width: w, height: h } = canvas;
+  const res = await fetch(\`/frame/\${id}?w=\${w}&h=\${h}&t=\${t}\`);
+  if (!res.ok) return false;
+  const px = new Uint8ClampedArray(await res.arrayBuffer());
+  canvas.getContext("2d")!.putImageData(new ImageData(px, w, h), 0, 0);
+  return true;
+}
+
+export function animate(canvas: HTMLCanvasElement, id: string) {
+  const t0 = performance.now();
+  const loop = async () => {
+    await drawFrame(canvas, id, (performance.now() - t0) / 1000);
+    requestAnimationFrame(loop);
+  };
+  loop();
+}` },
+  { name: 'pulse.py', lang: 'py', color: '#c3e88d', code:
+`# Analisa o espectro e detecta batidas por energia local.
+import numpy as np
+
+def detect_beats(samples: np.ndarray, rate: int = 48_000) -> list[float]:
+    window = 1024
+    energy = np.array([
+        np.sum(samples[i:i + window] ** 2)
+        for i in range(0, len(samples) - window, window)
+    ])
+    avg = np.convolve(energy, np.ones(43) / 43, mode="same")
+    beats = np.where(energy > avg * 1.4)[0]
+    return [b * window / rate for b in beats]` },
+];
+
+const KW = {
+  rs: /\b(use|pub|struct|impl|fn|let|mut|for|in|if|else|loop|continue|return|self|Self|match|as|mod|const)\b/,
+  hlsl: /\b(float|float2|float3|float4|int|for|return|if|static|const|cbuffer)\b/,
+  ts: /\b(async|function|const|let|await|return|if|export|new|of)\b/,
+  py: /\b(import|as|def|return|for|in|range|len|if)\b/,
+};
+// Destaque simples linha a linha: comentários, strings, números, tipos, funções e palavras-chave.
+function highlight(line, lang) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const com = lang === 'py' ? /#.*/ : /\/\/.*/;
+  const re = new RegExp([com.source, /"(?:[^"\\]|\\.)*"?|`[^`]*`?/.source, /\b\d[\d_.]*\b/.source,
+    /\b[A-Z][A-Za-z0-9_]*\b/.source, /\b[a-z_][a-z0-9_]*(?=\s*[(!])/.source, KW[lang].source].join('|'), 'g');
+  let out = '', last = 0;
+  line.replace(re, (m, ...rest) => {
+    const idx = rest[rest.length - 2];
+    out += esc(line.slice(last, idx));
+    const cls = com.test(m) && m.match(com).index === 0 ? 'com' : /^["`]/.test(m) ? 'str' : /^\d/.test(m) ? 'num'
+      : new RegExp('^' + KW[lang].source + '$').test(m) ? 'kw' : /^[A-Z]/.test(m) ? 'ty'
+      : line[idx + m.length] === '!' ? 'mac' : 'fn';
+    out += `<span class="${cls}">${esc(m)}</span>`;
+    last = idx + m.length;
+    return m;
+  });
+  return out + esc(line.slice(last));
+}
+
+const $ = id => document.getElementById(id);
+const LOGS = [
+  ['muted', '$ cargo build --release'],
+  ['info', '   Compiling isnotaengine v0.1.0'],
+  ['warn', 'warning: unused variable: `frame`'],
+  ['ok', '    Finished `release` profile [optimized] target(s) in 4.82s'],
+  ['muted', '$ cargo test'],
+  ['info', 'running 13 tests'],
+  ['ok', 'test result: ok. 13 passed; 0 failed'],
+  ['muted', '$ git commit -m "feat: aurora mais bonita"'],
+  ['ok', '[main 9be2721] feat: aurora mais bonita'],
+];
+let fileIdx = 0, typed = 0, logIdx = 0;
+
+function renderTabs() {
+  $('tabs').innerHTML = FILES.map((f, i) =>
+    `<div class="tab${i === fileIdx ? ' on' : ''}"><b style="background:${f.color}">${f.lang}</b>${f.name}</div>`).join('');
+  $('wtitle').textContent = `${FILES[fileIdx].name} — isnotaengine`;
+}
+function render() {
+  const f = FILES[fileIdx], text = f.code.slice(0, typed), lines = text.split('\n');
+  $('gutter').textContent = lines.map((_, i) => i + 1).join('\n');
+  const html = lines.map(l => highlight(l, f.lang));
+  html[html.length - 1] += '<span class="caret"></span>';
+  $('code').innerHTML = `<div class="cur-line" style="top:calc(1.2vmin + ${(lines.length - 1) * 2.45}vmin)"></div>` + html.join('\n');
+  $('minimap').innerHTML = f.code.split('\n').map((l, i) => {
+    const w = Math.min(100, l.trimEnd().length * 1.6), ind = (l.length - l.trimStart().length) * 1.6;
+    return `<div style="width:${Math.max(0, w - ind)}%;margin-left:${ind}%;background:${i < lines.length ? f.color : '#2a2f3d'}"></div>`;
+  }).join('');
+  $('pos').textContent = `Ln ${lines.length}, Col ${lines[lines.length - 1].length + 1}`;
+}
+function log() {
+  const [cls, msg] = LOGS[logIdx++ % LOGS.length];
+  const p = document.createElement('p'); p.className = cls; p.textContent = msg;
+  $('term').appendChild(p);
+  while ($('term').children.length > 7) $('term').firstChild.remove();
+}
+
+function step() {
+  const f = FILES[fileIdx];
+  document.body.classList.add('typing');
+  if (typed < f.code.length) {
+    // Digita em rajadas: às vezes uma palavra inteira, com pausas em quebras de linha
+    const ch = f.code[typed];
+    typed += Math.random() < 0.25 ? Math.min(4, f.code.length - typed) : 1;
+    render();
+    const delay = ch === '\n' ? 180 + Math.random() * 380 : 28 + Math.random() * 70;
+    setTimeout(step, delay);
+  } else {
+    document.body.classList.remove('typing');
+    let n = 0;
+    const burst = () => { log(); if (++n < 3) setTimeout(burst, 600 + Math.random() * 900); };
+    burst();
+    setTimeout(() => { fileIdx = (fileIdx + 1) % FILES.length; typed = 0; renderTabs(); render(); step(); }, 5200);
+  }
+}
+setInterval(() => { const d = new Date(); $('clock').textContent = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }, 1000);
+renderTabs(); render(); log(); step();
+</script>
+</body>
+</html>

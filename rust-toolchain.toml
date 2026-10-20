@@ -1,0 +1,5 @@
+[toolchain]
+# Toolchain MSVC: alvo nativo do Windows, rc.exe para recursos, depuração com PDB.
+# O default global da máquina é GNU; isto vale apenas para este projeto.
+channel = "stable-x86_64-pc-windows-msvc"
+components = ["rustfmt", "clippy"]

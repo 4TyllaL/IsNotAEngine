@@ -1,0 +1,28 @@
+[package]
+name = "IsNotAEngine"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+raw-window-handle = "0.6.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.152"
+toml = "1.1.8"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_System_Console", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D_Fxc", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_DirectComposition", "Win32_Graphics_Imaging", "Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_Security", "Win32_Security_Credentials", "Win32_Security_Authorization", "Win32_System_Pipes", "Win32_System_IO", "Win32_System_Power", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_Media_MediaFoundation", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_SystemInformation", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant", "Win32_UI_Controls_Dialogs", "Win32_UI_HiDpi", "Win32_System_StationsAndDesktops", "Win32_System_Registry", "Wdk_System_SystemInformation", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Storage_FileSystem", "Win32_System_WindowsProgramming", "Foundation", "ApplicationModel", "Win32_Storage_Packaging_Appx", "Media_Control", "Storage", "Storage_Streams", "System_UserProfile"] }
+wry = "0.57.0"
+webview2-com = "0.39.1"
+zip = "9.0.1"
+png = "0.18.1"
+ureq = { version = "3", features = ["json"] }
+
+
+
+
+
+
+
+[build-dependencies]
+embed-resource = "3.0.12"

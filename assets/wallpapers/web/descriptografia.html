@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Descriptografia</title>
+<style>
+  html,body{margin:0;height:100%;background:#0d0d0f;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Glifos em ondas: fundo cinza-escuro, ondas mais claras e ripples no clique (cor via retint).
+const cv = document.getElementById('c');
+const gl = cv.getContext('webgl', {antialias:false});
+if (!gl) throw new Error('WebGL indisponível');
+
+// ---------- glyph atlas (1 row of N glyphs) ----------
+const CHARS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ#$%&*+=<>?/\\|{}[]~^:;.,-_";
+const N = CHARS.length, G = 48;
+const at = document.createElement('canvas'); at.width = N*G; at.height = G;
+const ax = at.getContext('2d');
+ax.fillStyle = '#000'; ax.fillRect(0,0,at.width,at.height);
+ax.fillStyle = '#fff'; ax.font = `600 ${G*0.78}px "JetBrains Mono","Cascadia Mono",Consolas,monospace`;
+ax.textAlign = 'center'; ax.textBaseline = 'middle';
+[...CHARS].forEach((ch,i)=>ax.fillText(ch, i*G+G/2, G/2+2));
+
+// ---------- shaders ----------
+const vs = `attribute vec2 p; void main(){ gl_Position = vec4(p,0.,1.); }`;
+const fs = `
+precision highp float;
+uniform vec2 uRes; uniform float uTime, uCell, uN, uClock;
+uniform vec3 uAccent; uniform vec3 uRip[8];
+uniform vec3 uTone;     // cor das ondas mais claras (a cor de destaque do Studio; cinza no automático)
+uniform sampler2D uAtlas;
+
+float h11(float x){ return fract(sin(x*127.1)*43758.5453); }
+float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+float vnoise(vec2 p){
+  vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y);
+}
+float fbm(vec2 p){
+  float a=.5, s=0.;
+  for(int i=0;i<5;i++){ s+=a*vnoise(p); p=p*2.03+vec2(17.,9.); a*=.5; }
+  return s;
+}
+void main(){
+  vec2 frag = vec2(gl_FragCoord.x, uRes.y-gl_FragCoord.y);
+  vec2 cell = floor(frag/uCell);
+  vec2 loc  = fract(frag/uCell);
+  vec2 cc = (cell+.5)*uCell;
+
+  // ondas: nuvens em movimento + faixas que se deslocam
+  vec2 q = cell*0.03 + vec2(uTime*0.02, -uTime*0.012);
+  float warp = fbm(q*1.5 + uTime*0.03);
+  float n = fbm(q + warp*1.4);
+  float band = .5+.5*sin(cell.x*.045 + cell.y*.028 + warp*7. - uTime*.5);
+  float wave = smoothstep(.35,.85, n*.6 + band*.5);
+
+  float r = h21(cell);
+  float rate = mix(.15, 2., h11(r*91.7));
+  float gi = floor(h21(cell + floor(uTime*rate + r*50.)*1.37)*uN);
+  float tw = .6+.4*sin(uTime*(.6+r*2.5)+r*40.);
+
+  // glifos sempre fracos no fundo, mais claros nas ondas
+  float vis = step(.30 - wave*.45, h21(cell*1.91+3.3));
+  float lum = vis*(.07 + .30*wave)*tw;
+
+  // ripples do clique, na cor do accent
+  float rip = 0., ripGlow = 0.;
+  for(int i=0;i<8;i++){
+    vec3 R = uRip[i];
+    if(R.z < 0.) continue;
+    float age = uClock - R.z;
+    float d = distance(cc, R.xy);
+    float rad = age*uRes.y*0.55;
+    float w = uCell*(3.+age*6.);
+    float fade = exp(-age*0.9);
+    float ring = exp(-pow((d-rad)/w,2.));
+    float inside = smoothstep(rad, rad-w*2.5, d) * exp(-(rad-d)/(uRes.y*.25));
+    rip += ring*fade*1.2;
+    ripGlow += inside*fade*.35*step(d,rad+w);
+  }
+  float flick = .6+.4*h21(cell+floor(uClock*14.));
+  float rv = clamp(rip+ripGlow,0.,1.);
+  // ripple revela glifos mesmo onde estavam apagados
+  float revealed = step(1.-rv*1.1, h21(cell*2.7+1.1)) * rv;
+
+  float g = smoothstep(.15,.85, texture2D(uAtlas, vec2((gi + clamp(loc.x,.04,.96))/uN, clamp(loc.y,.04,.96))).r);
+
+  vec3 bg = vec3(.055,.056,.060);
+  vec3 gray = vec3(.62,.64,.68);
+  vec3 col = bg + mix(gray, uTone, wave)*g*lum;
+  col += uAccent*g*(rip*flick*1.5 + revealed*.8);
+  col += uAccent*ripGlow*.10;           // brilho de fundo suave da onda
+  col = mix(col, col*1.0, 1.);
+
+  vec2 nuv = gl_FragCoord.xy/uRes;
+  float vig = smoothstep(.0,.6, 1.-length((nuv-.5)*vec2(1.,1.1)));
+  col = mix(bg, col, .55+.45*vig);
+  gl_FragColor = vec4(col,1.);
+}`;
+
+function sh(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; }
+const pr = gl.createProgram();
+gl.attachShader(pr, sh(gl.VERTEX_SHADER,vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER,fs));
+gl.linkProgram(pr); gl.useProgram(pr);
+
+const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(pr,'p'); gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+
+const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,at);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+
+const U = n => gl.getUniformLocation(pr,n);
+const uTone=U('uTone'), uRes=U('uRes'), uTime=U('uTime'), uCell=U('uCell'), uN=U('uN'), uClock=U('uClock'), uAccent=U('uAccent'), uRip=U('uRip');
+gl.uniform1f(uN,N); gl.uniform1i(U('uAtlas'),0);
+
+const ACC=[[.30,.62,1.0],[.95,.50,.30],[.35,.90,.60],[.72,.45,1.0],[1,.35,.55]];
+let ai=0, acc=[...ACC[0]], clock=0;
+// Cor de destaque do Studio: as ondas claras e os pulsos a usam; no automático ficam cinza e azul.
+const GRAY=[.62,.64,.68];
+let tone=[...GRAY], toneGoal=[...GRAY], accGoal=ACC[0];
+function setTint(t){
+  if(t){ const c=[t.r/255,t.g/255,t.b/255]; toneGoal=c; accGoal=c; }
+  else { toneGoal=GRAY; accGoal=ACC[ai]; }
+}
+const eng = window.engine || {};
+if(eng.onTint) eng.onTint(setTint);
+const rips=new Float32Array(24).fill(-1); for(let i=0;i<8;i++) rips[i*3+2]=-1; let ri=0;
+let cell = 14, speed = 1, t0 = performance.now(), t = 0;
+addEventListener('pointerdown', e=>{
+  const d=Math.min(devicePixelRatio||1,2);
+  rips[ri*3]=e.clientX*d; rips[ri*3+1]=e.clientY*d; rips[ri*3+2]=clock; ri=(ri+1)%8;
+});
+function resize(){
+  const d = Math.min(devicePixelRatio||1, 2);
+  cv.width = innerWidth*d; cv.height = innerHeight*d;
+  gl.viewport(0,0,cv.width,cv.height);
+}
+addEventListener('resize', resize); resize();
+
+
+function frame(now){
+  const dt = (now-t0)/1000; t0 = now; t += dt*speed;
+  clock += dt;
+  for(let k=0;k<3;k++){ acc[k]+=(accGoal[k]-acc[k])*Math.min(1,dt*4); tone[k]+=(toneGoal[k]-tone[k])*Math.min(1,dt*4); }
+  const d = Math.min(devicePixelRatio||1, 2);
+  gl.uniform2f(uRes, cv.width, cv.height);
+  gl.uniform1f(uTime, t);
+  gl.uniform1f(uCell, cell*d);
+  gl.uniform3f(uTone,tone[0],tone[1],tone[2]);
+  gl.uniform1f(uClock, clock); gl.uniform3f(uAccent,acc[0],acc[1],acc[2]); gl.uniform3fv(uRip, rips);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

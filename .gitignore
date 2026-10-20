@@ -1,0 +1,18 @@
+/target
+*.pdb
+*.res
+.vs/
+.vscode/
+*.log
+/lab/runs/
+
+/shader_cache/
+/dist
+
+/perf/
+perf-run-*/
+
+# Vídeos de fábrica: arquivos grandes, gerados à parte (veja assets/wallpapers/videos/README.md)
+/assets/wallpapers/videos/*
+!/assets/wallpapers/videos/README.md
+!/assets/wallpapers/videos/*.json

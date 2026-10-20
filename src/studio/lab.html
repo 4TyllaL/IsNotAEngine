@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Lab</title>
+<style>
+  :root {
+    --bg:#0b0b10; --panel:rgba(22,22,32,.72); --solid:#13131b; --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+    --text:#f1eff8; --dim:#9b98ab; --faint:#66637a; --accent:#9d8bff; --ok:#44e0a5; --err:#ff7b95; --warn:#ffbf4d;
+    --brand:linear-gradient(120deg,#6b5bff 0%,#c13cff 45%,#ff4d7d 75%,#ff9a3d 100%);
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; color:var(--text); font:13px/1.5 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; overflow:hidden;
+    background: radial-gradient(800px 460px at 90% -10%, rgba(193,60,255,.1), transparent 60%), var(--bg); }
+  ::-webkit-scrollbar { width:12px; height:12px; }
+  ::-webkit-scrollbar-thumb { background:rgba(255,255,255,.09); border-radius:10px; border:4px solid transparent; background-clip:padding-box; }
+  ::-webkit-scrollbar-corner { background:transparent; }
+  button, select, input[type=text] { font:inherit; color:var(--text); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .lab { display:grid; grid-template-columns:minmax(340px,1.1fr) minmax(360px,1fr); grid-template-rows:auto 1fr; height:100%; gap:14px; padding:18px 22px 20px; }
+  .bar { grid-column:1 / 3; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .bar h2 { margin:0 8px 0 0; font-size:20px; font-weight:700; letter-spacing:-.02em; }
+  .field { display:flex; align-items:center; background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:11px; transition:.15s; }
+  .field:focus-within { border-color:var(--accent); background:rgba(157,139,255,.06); }
+  .field span { padding-left:11px; color:var(--faint); font-size:12px; }
+  .field input, .field select { background:none; border:0; outline:0; padding:8px 11px; color:var(--text); }
+  .field select option { background:#1b1b26; }
+  .field input { width:150px; }
+  .btn { background:rgba(255,255,255,.05); border:1px solid var(--line2); border-radius:11px; padding:8px 14px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:background .15s, transform .1s; }
+  .btn:hover { background:rgba(255,255,255,.09); } .btn:active { transform:scale(.98); }
+  .btn.primary { background:var(--brand) border-box; border-color:transparent; font-weight:600; color:#fff; box-shadow:0 10px 26px -10px rgba(193,60,255,.7); }
+  .btn.primary:hover { filter:brightness(1.1) saturate(1.1); }
+  .btn svg { width:14px; height:14px; }
+  .chk { display:flex; gap:9px; align-items:center; color:var(--dim); cursor:pointer; user-select:none; }
+  .chk input { appearance:none; width:34px; height:20px; border-radius:999px; background:rgba(255,255,255,.12); position:relative; margin:0; cursor:pointer; transition:.2s; }
+  .chk input::after { content:""; position:absolute; left:3px; top:3px; width:14px; height:14px; border-radius:50%; background:#d4d2de; transition:.22s cubic-bezier(.3,1.4,.5,1); }
+  .chk input:checked { background:var(--brand); } .chk input:checked::after { transform:translateX(14px); background:#fff; }
+  .sp { flex:1; }
+  .st { display:flex; gap:8px; align-items:center; padding:6px 12px; border-radius:999px; background:rgba(255,255,255,.04); border:1px solid var(--line); color:var(--dim); font-size:12px; }
+  .st i { width:8px; height:8px; border-radius:50%; background:var(--faint); display:inline-block; }
+  .st.ok i { background:var(--ok); box-shadow:0 0 10px var(--ok); } .st.ok { color:var(--text); }
+  .st.err i { background:var(--err); box-shadow:0 0 10px var(--err); } .st.err { color:#ffc2cd; }
+  .st.busy i { background:var(--accent); animation:pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity:.3; } }
+
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:18px; backdrop-filter:blur(14px); min-height:0; overflow:hidden; display:flex; flex-direction:column; }
+  .card-h { display:flex; align-items:center; gap:10px; padding:11px 16px; border-bottom:1px solid var(--line); color:var(--dim); font-size:12px; letter-spacing:.06em; text-transform:uppercase; font-weight:600; }
+  .card-h .dot { width:8px; height:8px; border-radius:50%; background:#ff5f57; box-shadow:16px 0 0 #febc2e, 32px 0 0 #28c840; margin-right:36px; }
+  .card-h .name { text-transform:none; letter-spacing:0; font-weight:500; color:var(--text); font-family:Consolas,"Cascadia Mono",monospace; font-size:12.5px; }
+  .editor { position:relative; flex:1; min-height:0; background:rgba(5,5,9,.45); }
+  textarea { position:absolute; inset:0; width:100%; height:100%; resize:none; border:0; outline:0; padding:14px 16px 14px 56px; background:transparent; color:#d9d6ee; caret-color:#ff9a3d;
+    font:13px/1.55 "Cascadia Code",Consolas,monospace; tab-size:4; white-space:pre; overflow:auto; }
+  textarea::selection { background:rgba(157,139,255,.35); }
+  .gutter { position:absolute; left:0; top:0; bottom:0; width:42px; padding:14px 8px 0 0; text-align:right; color:var(--faint); font:13px/1.55 "Cascadia Code",Consolas,monospace; overflow:hidden; white-space:pre; pointer-events:none; border-right:1px solid var(--line); background:rgba(255,255,255,.015); }
+  .side { display:flex; flex-direction:column; gap:14px; min-height:0; }
+  .view { padding:14px; }
+  canvas { width:100%; aspect-ratio:16/9; background:#000; border:1px solid var(--line2); border-radius:12px; display:block; box-shadow:0 20px 50px -24px rgba(0,0,0,.9); }
+  .meta { display:flex; gap:10px; align-items:center; margin-top:12px; color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+  .pill { padding:4px 10px; border-radius:999px; background:rgba(255,255,255,.05); border:1px solid var(--line); }
+  .meta .sp { flex:1; }
+  .meta .btn { padding:5px 11px; font-size:12px; border-radius:9px; }
+  .meta select { background:rgba(255,255,255,.05); border:1px solid var(--line2); border-radius:9px; padding:5px 8px; font-size:12px; }
+  .meta select option { background:#1b1b26; }
+  pre#err { margin:0; padding:12px 14px; background:rgba(255,80,110,.07); border:1px solid rgba(255,100,130,.28); color:#ffc2cd; border-radius:14px; font:12px/1.55 "Cascadia Code",Consolas,monospace; white-space:pre-wrap; overflow:auto; max-height:34vh; display:none; user-select:text; }
+  .params { padding:12px 16px 14px; gap:6px; }
+  .params[hidden] { display:none; }
+  .params .ph { display:flex; align-items:center; justify-content:space-between; color:var(--dim); font-size:12px; letter-spacing:.06em; text-transform:uppercase; font-weight:600; }
+  .params .ph .btn { padding:4px 10px; font-size:11.5px; border-radius:9px; text-transform:none; letter-spacing:0; }
+  .prow { display:grid; grid-template-columns:1fr auto; gap:1px 10px; align-items:center; }
+  .prow label { font-size:12.5px; }
+  .prow output { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; min-width:44px; text-align:right; }
+  .prow small { grid-column:1 / 3; color:var(--faint); font-size:11px; }
+  .prow input[type=range] { grid-column:1 / 3; width:100%; accent-color:var(--accent); }
+  .hint { padding:14px 16px; color:var(--dim); font-size:12.5px; line-height:1.65; }
+  .hint b { color:var(--text); font-weight:600; display:block; margin-bottom:6px; }
+  .hint code { background:rgba(255,255,255,.07); border-radius:6px; padding:1px 6px; color:#ddd8ff; font:12px "Cascadia Code",Consolas,monospace; }
+  .hint ul { margin:0; padding:0; list-style:none; display:flex; flex-wrap:wrap; gap:6px; }
+</style></style>
+</head>
+<body>
+<div class="lab">
+  <div class="bar">
+    <h2>Lab</h2>
+    <label class="field"><span>Modelo</span><select id="tpl" title="Começar de um modelo ou de um shader existente"><option value="">Começar de…</option></select></label>
+    <label class="field"><span>Arquivo</span><input type="text" id="name" value="meu_shader" title="Nome do arquivo" spellcheck="false"></label>
+    <button class="btn" id="save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h8V4M8 20v-6h8v6"/></svg>Salvar</button>
+    <button class="btn primary" id="apply"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Aplicar no desktop</button>
+    <label class="chk"><input type="checkbox" id="live">Atualizar o desktop ao digitar</label>
+    <span class="sp"></span>
+    <span class="st busy" id="st"><i></i><span>pronto</span></span>
+  </div>
+  <div class="card">
+    <div class="card-h"><span class="dot"></span><span class="name">shader.hlsl</span></div>
+    <div class="editor"><div class="gutter" id="gut"></div><textarea id="code" spellcheck="false" autocomplete="off"></textarea></div>
+  </div>
+  <div class="side">
+    <div class="card view">
+      <canvas id="cv" width="640" height="360"></canvas>
+      <div class="meta"><span class="pill" id="fps">—</span><span class="pill" id="tm">t = 0.0 s</span><span class="sp"></span><button class="btn" id="pp">Pausar</button><select id="res"><option>480×270</option><option selected>640×360</option><option>960×540</option><option>1280×720</option></select></div>
+    </div>
+    <pre id="err"></pre>
+    <div class="card params" id="params" hidden></div>
+    <div class="card hint">
+      <b>Contrato do shader</b>
+      <ul><li><code>float4 ps_main(float4 pos : SV_Position) : SV_Target</code></li><li><code>T()</code></li><li><code>frag_p(pos)</code></li><li><code>P(i)</code></li><li><code>finish(col, pos)</code></li></ul>
+      <div style="margin-top:10px">Parâmetros ajustáveis com <code>// param: nome min max padrão</code>. Cursor: <code>cursor_swirl()</code> e <code>cursor_lens()</code>. Detalhes em <code>docs/shader-contract.md</code>.</div>
+    </div>
+  </div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const code = $('#code'), cv = $('#cv'), g = cv.getContext('2d'), st = $('#st'), errBox = $('#err');
+const TEMPLATE = `// Meu shader: edite e veja ao vivo ao lado.
+// param: brilho 0.2 2 1
+
+float4 ps_main(float4 pos : SV_Position) : SV_Target
+{
+    float2 uv = frag_uv(pos);
+    float2 p = frag_p(pos);
+    float t = T() * 0.3;
+    float3 col = 0.5 + 0.5 * cos(t + uv.xyx * 3.0 + float3(0, 2, 4));
+    col *= 0.25 + 0.75 * smoothstep(0.9, 0.0, length(p));
+    col *= P(0);
+    col *= 0.5 + 0.5 * vignette(uv, 0.3);
+    return float4(finish(col, pos), 1.0);
+}
+`;
+const store = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+code.value = store.get('lab.code') || TEMPLATE;
+$('#name').value = store.get('lab.name') || 'meu_shader';
+
+function gutter() { const n = code.value.split('\n').length; $('#gut').textContent = Array.from({ length: n }, (_, i) => i + 1).join('\n'); $('#gut').scrollTop = code.scrollTop; }
+code.addEventListener('scroll', () => { $('#gut').scrollTop = code.scrollTop; });
+code.addEventListener('keydown', e => {
+  if (e.key === 'Tab') { e.preventDefault(); const s = code.selectionStart; code.setRangeText('    ', s, code.selectionEnd, 'end'); code.dispatchEvent(new Event('input')); }
+});
+
+/* Parâmetros: espelho de render/params.rs (`// param: nome min max padrão -- descrição`, até 8, nas 40 primeiras linhas). */
+function parseParams(src) {
+  const out = [];
+  src.split('\n').slice(0, 40).forEach(line => {
+    const m = /^\s*\/\/\s*param:\s*(.*)$/.exec(line); if (!m) return;
+    const [args, ...d] = m[1].split('--');
+    const t = args.trim().split(/\s+/);
+    const nums = t.slice(1).map(Number);
+    if (!/^[A-Za-z0-9_]{1,32}$/.test(t[0] || '') || nums.length !== 3 || nums.some(n => !Number.isFinite(n)) || nums[0] > nums[1] || out.length >= 8) return;
+    out.push({ name: t[0], min: nums[0], max: nums[1], default: Math.min(nums[1], Math.max(nums[0], nums[2])), description: d.join('--').trim().slice(0, 80) });
+  });
+  return out;
+}
+let pvals = {};                                   // nome -> valor escolhido (vale para o shader aberto)
+try { pvals = JSON.parse(store.get('lab.pvals') || '{}') || {}; } catch { pvals = {}; }
+const niceName = n => n.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+const fmtNum = x => { const s = Math.abs(x) >= 10 ? x.toFixed(0) : Math.abs(x) >= 1 ? x.toFixed(2) : x.toFixed(3); return s.includes('.') ? s.replace(/\.?0+$/, '') : s; };
+const pvalue = p => Number.isFinite(pvals[p.name]) ? Math.min(p.max, Math.max(p.min, pvals[p.name])) : p.default;
+const pquery = () => { const ps = parseParams(code.value); return ps.length ? '&p=' + encodeURIComponent(ps.map(p => p.name + ':' + pvalue(p)).join(',')) : ''; };
+const pcurrent = () => Object.fromEntries(parseParams(code.value).map(p => [p.name, pvalue(p)]));
+let pSig = '';
+function renderParams() {
+  const ps = parseParams(code.value);
+  const sig = JSON.stringify(ps);
+  if (sig === pSig) return;                       // só remonta quando as declarações mudam (não a cada tecla)
+  pSig = sig;
+  const box = $('#params'); box.textContent = ''; box.hidden = !ps.length;
+  if (!ps.length) return;
+  const head = document.createElement('div'); head.className = 'ph';
+  const t = document.createElement('span'); t.textContent = 'Parâmetros';
+  const reset = document.createElement('button'); reset.className = 'btn'; reset.textContent = 'Padrões';
+  reset.onclick = () => { pvals = {}; store.set('lab.pvals', '{}'); pSig = ''; renderParams(); pushParams(); };
+  head.append(t, reset); box.appendChild(head);
+  for (const p of ps) {
+    const id = 'lp_' + p.name, v = pvalue(p);
+    const row = document.createElement('div'); row.className = 'prow';
+    const lb = document.createElement('label'); lb.htmlFor = id; lb.textContent = niceName(p.name);
+    const out = document.createElement('output'); out.htmlFor = id; out.textContent = fmtNum(v);
+    const r = document.createElement('input'); r.type = 'range'; r.id = id; r.min = p.min; r.max = p.max; r.step = (p.max - p.min) / 200; r.value = v;
+    r.setAttribute('aria-label', niceName(p.name) + (p.description ? ': ' + p.description : '')); r.setAttribute('aria-valuetext', fmtNum(v));
+    r.oninput = () => { pvals[p.name] = +r.value; out.textContent = fmtNum(+r.value); r.setAttribute('aria-valuetext', fmtNum(+r.value)); store.set('lab.pvals', JSON.stringify(pvals)); pushParams(); };
+    row.append(lb, out);
+    if (p.description) { const d = document.createElement('small'); d.textContent = p.description; row.appendChild(d); }
+    row.appendChild(r); box.appendChild(row);
+  }
+}
+// Com o shader salvo, o desktop recebe os mesmos valores da prévia (e o "Atualizar ao digitar" continua valendo).
+let pushTimer = 0;
+function pushParams() { clearTimeout(pushTimer); pushTimer = setTimeout(() => { if (savedPath) parent.postMessage({ lab: 'params', path: savedPath, values: pcurrent() }, '*'); }, 80); }
+
+function setStatus(kind, text) { st.className = 'st ' + kind; st.querySelector('span').textContent = text; }
+let ok = false, rev = 0, compileTimer = 0, saveTimer = 0, savedPath = '';
+
+// O erro do FXC cita "(linha,coluna)"; o prefixo de common.hlsli não conta porque o motor usa #line 1.
+async function compile() {
+  const my = ++rev; setStatus('busy', 'compilando…');
+  let res, msg;
+  try { res = await fetch('/lab/code', { method: 'POST', body: code.value }); msg = await res.text(); }
+  catch (e) { if (my === rev) { setStatus('err', 'sem conexão com o motor'); } return; }
+  if (my !== rev) return;                       // chegou uma edição mais nova
+  if (res.ok) { ok = true; errBox.style.display = 'none'; setStatus('ok', 'compilado'); if ($('#live').checked && savedPath) save(false); }
+  else { errBox.textContent = msg; errBox.style.display = 'block'; setStatus('err', ok ? 'erro (mantendo o último válido)' : 'erro'); }
+}
+code.addEventListener('input', () => {
+  gutter(); store.set('lab.code', code.value); renderParams();
+  clearTimeout(compileTimer); compileTimer = setTimeout(compile, 350);
+});
+const tabName = () => { $('.card-h .name').textContent = ($('#name').value.trim() || 'shader') + '.hlsl'; };
+$('#name').addEventListener('input', () => { store.set('lab.name', $('#name').value); savedPath = ''; tabName(); });
+tabName();
+
+async function save(announce) {
+  const res = await fetch('/lab/save?name=' + encodeURIComponent($('#name').value), { method: 'POST', body: code.value });
+  const path = await res.text();
+  if (!res.ok) { setStatus('err', 'falha ao salvar: ' + path); return null; }
+  savedPath = path; if (announce) setStatus('ok', 'salvo');
+  parent.postMessage({ lab: 'params', path, values: pcurrent() }, '*');    // o preset (valores) acompanha o arquivo salvo
+  return path;
+}
+$('#save').onclick = () => save(true);
+$('#apply').onclick = async () => {
+  if (!ok) { setStatus('err', 'corrija os erros antes de aplicar'); return; }
+  const path = await save(false);
+  if (path) { parent.postMessage({ lab: 'apply', path, values: pcurrent() }, '*'); setStatus('ok', 'aplicado no desktop'); }
+};
+
+fetch('/lab/list').then(r => r.json()).then(list => {
+  const groups = {};
+  for (const it of list) {
+    const g = it.group || 'Outros';
+    if (!groups[g]) { groups[g] = document.createElement('optgroup'); groups[g].label = g; $('#tpl').appendChild(groups[g]); }
+    const o = document.createElement('option'); o.value = it.id; o.textContent = it.title; if (it.description) o.title = it.description; groups[g].appendChild(o);
+  }
+}).catch(() => {});
+$('#tpl').onchange = async e => {
+  const id = e.target.value; if (!id) return;
+  const r = await fetch('/lab/source/' + id);
+  if (r.ok) { code.value = await r.text(); $('#name').value = id.startsWith('tpl:') ? id.slice(4) : id + '_v2'; store.set('lab.name', $('#name').value); savedPath = ''; pvals = {}; store.set('lab.pvals', '{}'); pSig = ''; tabName(); code.dispatchEvent(new Event('input')); }
+  e.target.value = '';
+};
+
+// ---------- prévia ----------
+let paused = false, t0 = performance.now(), tPaused = 0, last = 0, frames = 0, fpsT = performance.now();
+$('#pp').onclick = () => { paused = !paused; $('#pp').textContent = paused ? 'Retomar' : 'Pausar'; if (paused) tPaused = performance.now(); else t0 += performance.now() - tPaused; };
+$('#res').onchange = () => { const [w, h] = $('#res').value.split('×').map(Number); cv.width = w; cv.height = h; };
+async function loop() {
+  if (!document.hidden && ok && !paused) {
+    const w = cv.width, h = cv.height, t = (performance.now() - t0) / 1000;
+    try {
+      const res = await fetch(`/lab/frame?w=${w}&h=${h}&t=${t.toFixed(3)}${pquery()}`);
+      if (res.ok) {
+        const buf = new Uint8ClampedArray(await res.arrayBuffer());
+        if (buf.length === w * h * 4) { g.putImageData(new ImageData(buf, w, h), 0, 0); frames++; }
+      }
+    } catch {}
+    $('#tm').textContent = 't = ' + t.toFixed(1) + ' s';
+    const now = performance.now(); if (now - fpsT > 1000) { $('#fps').textContent = (frames * 1000 / (now - fpsT)).toFixed(0) + ' fps'; frames = 0; fpsT = now; }
+  }
+  setTimeout(loop, 33);
+}
+// O Studio pode abrir aqui um shader (por exemplo, o que a IA gerou) para ajustar código e parâmetros.
+window.addEventListener('message', ev => {
+  const d = ev.data;
+  if (ev.source !== parent || !d || d.studio !== 'load' || typeof d.code !== 'string') return;
+  code.value = d.code; savedPath = ''; pvals = {}; store.set('lab.pvals', '{}'); pSig = '';
+  $('#name').value = String(d.name || 'ia').toLowerCase().replace(/[^a-z0-9_-]+/g, '_').slice(0, 40) || 'ia';
+  store.set('lab.name', $('#name').value); tabName(); code.dispatchEvent(new Event('input'));
+});
+gutter(); renderParams(); compile(); loop();
+</script>
+</body>
+</html>

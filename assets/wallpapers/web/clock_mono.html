@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="retint" content="#89b4fa">
+<title>Clock · Mono</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c11; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Relógio minimalista em matriz de pontos (5x7), em uma cor só. Redesenha uma vez por segundo, alinhado à virada do
+// relógio do sistema: custo de CPU desprezível. `?t=HH:MM:SS` congela a hora (só para desenvolvimento).
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const QS = new URLSearchParams(location.search);
+const FIXED = QS.get('t');
+const COL = { bg: '#0b0c11', t: [205, 214, 244], d: '#6c7086', f: '#3b3f52', a: [137, 180, 250] };
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+const GLYPH = {
+  '0': ['01110','10001','10011','10101','11001','10001','01110'],
+  '1': ['00100','01100','00100','00100','00100','00100','01110'],
+  '2': ['01110','10001','00001','00010','00100','01000','11111'],
+  '3': ['11110','00001','00001','01110','00001','00001','11110'],
+  '4': ['00010','00110','01010','10010','11111','00010','00010'],
+  '5': ['11111','10000','11110','00001','00001','10001','01110'],
+  '6': ['00110','01000','10000','11110','10001','10001','01110'],
+  '7': ['11111','00001','00010','00100','01000','01000','01000'],
+  '8': ['01110','10001','10001','01110','10001','10001','01110'],
+  '9': ['01110','10001','10001','01111','00001','00010','01100'],
+  ':': ['0','0','1','0','1','0','0'],
+};
+const DIAS = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const p2 = n => String(n).padStart(2, '0');
+
+function now() {
+  const d = new Date();
+  if (FIXED) { const [h, m, s] = FIXED.split(':').map(Number); d.setHours(h || 0, m || 0, s || 0); }
+  return d;
+}
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7);
+}
+const dayOfYear = d => Math.floor((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(d.getFullYear(), 0, 0)) / 864e5);
+const daysInYear = y => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
+
+let W = 0, H = 0, dpr = 1;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  draw();
+}
+addEventListener('resize', resize);
+
+function glyphCols(ch) { return GLYPH[ch][0].length; }
+
+function draw() {
+  const d = now();
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = COL.bg; g.fillRect(0, 0, W, H);
+  g.textRendering = 'optimizeSpeed';
+
+  const text = p2(d.getHours()) + ':' + p2(d.getMinutes());
+  // largura em células: glifos + 1 coluna de espaço entre eles (o ':' tem 1 coluna)
+  const cols = [...text].reduce((n, ch) => n + glyphCols(ch), 0) + (text.length - 1) * 2;
+  const rows = 7;
+  const pitch = Math.floor(Math.min(W * 0.62 / cols, H * 0.42 / rows));
+  const dot = pitch * 0.72;
+  const gw = cols * pitch, gh = rows * pitch;
+  const x0 = Math.round((W - gw) / 2), y0 = Math.round(H * 0.5 - gh * 0.62);
+
+  // matriz: pontos apagados em todo o retângulo, acesos nos glifos
+  const lit = [];
+  let cx = 0;
+  for (const ch of text) {
+    const gl = GLYPH[ch], w = gl[0].length;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < w; c++) lit.push([cx + c, r, gl[r][c] === '1']);
+    cx += w + 2;
+  }
+  g.fillStyle = 'rgba(205,214,244,.05)';
+  for (const [c, r, on] of lit) if (!on) g.fillRect(x0 + c * pitch + (pitch - dot) / 2, y0 + r * pitch + (pitch - dot) / 2, dot, dot);
+  g.save();
+  g.shadowColor = rgba(COL.a, 0.45); g.shadowBlur = pitch * 0.9;
+  g.fillStyle = rgba(COL.t, 0.96);
+  for (const [c, r, on] of lit) if (on) g.fillRect(x0 + c * pitch + (pitch - dot) / 2, y0 + r * pitch + (pitch - dot) / 2, dot, dot);
+  g.restore();
+  // o ':' pisca em azul de acento, no ritmo dos segundos
+  const colonX = (() => { let x = 0; for (const ch of text) { if (ch === ':') return x; x += glyphCols(ch) + 2; } return 0; })();
+  if (d.getSeconds() % 2 === 0) {
+    g.fillStyle = rgba(COL.a, 1);
+    for (const [c, r, on] of lit) if (on && c === colonX) g.fillRect(x0 + c * pitch + (pitch - dot) / 2, y0 + r * pitch + (pitch - dot) / 2, dot, dot);
+  }
+
+  // régua de 60 segundos, com a largura do relógio
+  const ty = y0 + gh + pitch * 1.6, tw = gw, tick = tw / 60, th = Math.max(8, pitch * 0.5);
+  const s = d.getSeconds();
+  for (let i = 0; i < 60; i++) {
+    const x = x0 + i * tick + tick / 2, major = i % 5 === 0;
+    const age = (s - i + 60) % 60;
+    let a = 0.16, c = COL.t, hh = major ? th : th * 0.55;
+    if (i === s) { a = 1; c = COL.a; hh = th * 1.5; }
+    else if (age > 0 && age < 12) { a = 0.16 + (1 - age / 12) * 0.5; c = COL.a; }
+    g.fillStyle = rgba(c, a);
+    g.fillRect(Math.round(x - 1), Math.round(ty + (th * 1.5 - hh) / 2), 2, Math.round(hh));
+  }
+
+  // data e rodapé
+  const fs = Math.max(13, Math.round(pitch * 0.62)), small = Math.max(11, Math.round(fs * 0.72));
+  g.textBaseline = 'alphabetic';
+  g.font = `${fs}px Consolas, "Cascadia Mono", "Courier New", monospace`;
+  g.textAlign = 'center';
+  g.fillStyle = 'rgba(205,214,244,.78)';
+  const dateStr = `${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+  g.fillText(dateStr, W / 2, ty + th * 1.5 + fs * 2.1);
+
+  const doy = dayOfYear(d), diy = daysInYear(d.getFullYear());
+  const dayPct = (d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()) / 86400;
+  g.font = `${small}px Consolas, "Cascadia Mono", "Courier New", monospace`;
+  g.fillStyle = COL.d;
+  const meta = `semana ${p2(isoWeek(d))}  ·  dia ${String(doy).padStart(3, '0')}/${diy}  ·  ${p2(d.getHours())}h${p2(d.getMinutes())}min  ·  UTC${(o => (o <= 0 ? '+' : '-') + Math.abs(o / 60))(d.getTimezoneOffset())}`;
+  g.fillText(meta, W / 2, ty + th * 1.5 + fs * 2.1 + small * 2.2);
+
+  // barra do dia (fina), com a largura do relógio
+  const by = ty + th * 1.5 + fs * 2.1 + small * 3.6;
+  g.fillStyle = COL.f; g.fillRect(x0, by, gw, 2);
+  g.fillStyle = rgba(COL.a, 0.9); g.fillRect(x0, by, Math.round(gw * dayPct), 2);
+  g.textAlign = 'left'; g.fillStyle = COL.d;
+  g.fillText('dia', x0, by + small * 1.7);
+  g.textAlign = 'right'; g.fillText((dayPct * 100).toFixed(1) + '%', x0 + gw, by + small * 1.7);
+}
+
+// uma passada por segundo, alinhada à virada do segundo
+function loop() {
+  if (!document.hidden) draw();
+  setTimeout(loop, 1000 - (Date.now() % 1000) + 5);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) draw(); });
+resize(); loop();
+</script>
+</body>
+</html>

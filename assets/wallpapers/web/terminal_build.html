@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="retint" content="#a6e3a1">
+<title>Terminal · Build</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c11; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Terminal de CI: um pipeline (checkout, build, test, lint, package) rolando devagar. Os crates, as versões e os
+// nomes dos testes são os do próprio projeto (Cargo.lock e `cargo test -- --list`), então o texto é verossímil.
+// Desenho em canvas, em três regiões independentes (log, painel, barra), redesenhadas só quando algo muda.
+// `?speed=8` acelera a linha do tempo (só para desenvolvimento).
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const QS = new URLSearchParams(location.search);
+const SPEED = Math.max(0.25, +QS.get('speed') || 1);
+const DEV = QS.has('speed');
+const FORCE = QS.get('force') || '';        // desenvolvimento: force=warn | fail para ver os caminhos raros                // desenvolvimento: ignora a pausa por página oculta (o painel de teste fica oculto)
+const isHidden = () => document.hidden && !DEV;
+const COL = {
+  bg: '#0b0c11', line: '#2a2e3d', t: '#cdd6f4', d: '#6c7086', f: '#3b3f52', unlit: 'rgba(205,214,244,.055)',
+  g: [166, 227, 161], y: [249, 226, 175], r: [243, 139, 168], b: [137, 180, 250], m: [203, 166, 247], c: [148, 226, 213],
+};
+const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+const colorOf = k => Array.isArray(COL[k]) ? rgb(COL[k]) : (COL[k] || COL.t);
+const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+
+// ---------- dados do projeto ----------
+const CRATES = ["adler2 v2.0.1", "aes v0.9.3", "aho-corasick v1.1.5", "autocfg v1.5.1", "base64 v0.22.1", "bit-set v0.8.0", "bit-vec v0.8.0", "bitflags v1.3.2", "bitflags v2.13.2", "bumpalo v3.20.3", "bytes v1.12.1", "bzip2 v0.6.1", "cc v1.7.0", "cesu8 v1.1.0", "cfg-expr v0.15.8", "cfg-if v1.0.5", "cfg_aliases v0.2.2", "cipher v0.5.2", "cmov v0.5.4", "combine v4.6.8", "const-oid v0.10.2", "constant_time_eq v0.4.2", "cookie v0.18.2", "cpubits v0.1.1", "cpufeatures v0.2.17", "cpufeatures v0.3.1", "crc32fast v1.5.2", "crossbeam-channel v0.5.17", "crossbeam-utils v0.8.23", "crypto-common v0.1.7", "crypto-common v0.2.2", "cssparser v0.37.0", "cssparser-macros v0.7.1", "ctutils v0.4.3", "deflate64 v0.1.12", "deranged v0.5.8", "derive_more v2.1.1", "derive_more-impl v2.1.1", "digest v0.10.7", "digest v0.11.3", "dirs v7.0.0", "dirs-sys v0.5.0", "displaydoc v0.2.7", "dom_query v0.28.0", "dpi v0.1.2", "dtoa v1.0.11", "dtoa-short v0.3.5", "dunce v1.0.5", "embed-resource v3.0.12", "equivalent v1.0.2", "fastrand v2.5.0", "fdeflate v0.3.7", "field-offset v0.3.6", "find-msvc-tools v0.1.14", "flate2 v1.1.10", "foldhash v0.2.0", "form_urlencoded v1.2.2", "futures-channel v0.3.34", "futures-core v0.3.34", "futures-executor v0.3.34", "futures-io v0.3.34", "futures-macro v0.3.34", "futures-task v0.3.34", "futures-util v0.3.34", "generic-array v0.14.7", "getrandom v0.4.3", "hashbrown v0.17.1", "heck v0.4.1", "heck v0.5.0", "hmac v0.13.0", "html5ever v0.39.0", "http v1.5.0", "hybrid-array v0.4.15", "icu_collections v2.3.0", "icu_locale_core v2.3.0", "icu_normalizer v2.3.0", "icu_normalizer_data v2.3.0", "icu_properties v2.3.0", "icu_properties_data v2.3.0", "icu_provider v2.3.1", "idna v1.1.0", "idna_adapter v1.2.2", "indexmap v2.14.2", "inout v0.2.2", "itoa v1.0.18", "jobserver v0.1.35", "lazy_static v1.5.1", "libbz2-rs-sys v0.2.5", "litemap v0.8.3", "lock_api v0.4.14", "log v0.4.34", "lzma-rust2 v0.21.0", "markup5ever v0.39.0", "matchers v0.2.0", "memchr v2.8.3", "memoffset v0.9.1", "miniz_oxide v0.8.9", "miniz_oxide v0.9.1", "new_debug_unreachable v1.0.6", "nu-ansi-term v0.50.3", "num-conv v0.2.2", "num_enum v0.7.6", "num_enum_derive v0.7.6", "once_cell v1.21.4", "option-ext v0.2.0", "parking_lot v0.12.5", "parking_lot_core v0.9.12", "pbkdf2 v0.13.0", "percent-encoding v2.3.2", "phf v0.13.1", "phf_codegen v0.13.1", "phf_generator v0.13.1", "phf_macros v0.13.1", "phf_shared v0.13.1", "pin-project-lite v0.2.17", "png v0.18.1", "potential_utf v0.1.6", "powerfmt v0.2.1", "ppmd-rust v1.5.0", "precomputed-hash v0.1.1", "proc-macro-crate v1.3.1", "proc-macro-crate v2.0.2", "proc-macro-crate v3.5.0", "proc-macro-error v1.0.4", "proc-macro-error-attr v1.0.4", "proc-macro2 v1.0.107", "quote v1.0.47", "r-efi v6.0.0", "raw-window-handle v0.6.2", "regex-automata v0.4.18", "regex-syntax v0.8.11", "rustc-hash v2.1.3", "rustc_version v0.4.1", "rustversion v1.0.23", "same-file v1.0.6", "scopeguard v1.2.0", "selectors v0.38.0", "semver v1.0.28", "serde v1.0.229", "serde_core v1.0.229", "serde_derive v1.0.229", "serde_json v1.0.152", "serde_spanned v0.6.9", "serde_spanned v1.1.2", "servo_arc v0.4.3", "sha1 v0.11.0", "sha2 v0.10.9", "sha2 v0.11.0", "sharded-slab v0.1.7", "shlex v2.0.1", "simd-adler32 v0.3.10", "siphasher v1.0.4", "slab v0.4.12", "smallvec v1.16.3", "stable_deref_trait v1.2.1", "string_cache v0.9.0", "string_cache_codegen v0.6.1", "syn v1.0.109", "syn v2.0.119", "syn v3.0.7", "synstructure v0.14.0", "tao-macros v0.1.4", "target-lexicon v0.12.16", "tendril v0.5.1", "thiserror v1.0.69", "thiserror v2.0.21", "thiserror-impl v1.0.69", "thiserror-impl v2.0.21", "thread_local v1.1.10", "time v0.3.55", "time-core v0.1.9", "time-macros v0.2.32", "tinystr v0.8.4", "toml v0.8.2", "toml v1.1.8+spec-1.1.0", "toml_datetime v0.6.3", "toml_datetime v1.1.2+spec-1.1.0", "toml_edit v0.19.15", "toml_edit v0.20.2", "toml_edit v0.25.17+spec-1.1.0", "toml_parser v1.1.5+spec-1.1.0", "toml_writer v1.1.3+spec-1.1.0", "tracing v0.1.44", "tracing-attributes v0.1.31", "tracing-core v0.1.36", "tracing-log v0.2.0", "tracing-subscriber v0.3.23", "typed-path v0.12.3", "typenum v1.20.1", "unicode-ident v1.0.26", "url v2.5.8", "utf8_iter v1.0.4", "valuable v0.1.1", "version-compare v0.2.1", "version_check v0.9.5", "vswhom v0.1.0", "vswhom-sys v0.1.3", "walkdir v2.5.0", "web_atoms v0.2.6", "webview2-com v0.39.1", "webview2-com-macros v0.8.1", "webview2-com-sys v0.39.1", "winapi v0.3.9", "winapi-util v0.1.11", "windows v0.62.2", "windows-collections v0.3.2", "windows-core v0.62.2", "windows-future v0.3.2", "windows-implement v0.60.2", "windows-interface v0.59.3", "windows-link v0.2.1", "windows-numerics v0.3.1", "windows-result v0.4.1", "windows-strings v0.5.1", "windows-sys v0.45.0", "windows-sys v0.61.2", "windows-targets v0.42.2", "windows-threading v0.2.1", "windows-version v0.1.7", "windows_x86_64_msvc v0.42.2", "winnow v0.5.40", "winnow v1.0.4", "winreg v0.56.0", "writeable v0.6.4", "wry v0.57.0", "yoke v0.8.3", "yoke-derive v0.8.4", "zerofrom v0.1.8", "zerofrom-derive v0.1.8", "zeroize v1.9.1", "zerotrie v0.2.5", "zerovec v0.11.8", "zerovec-derive v0.11.6", "zip v9.0.1", "zlib-rs v0.6.8", "zmij v1.0.23", "zopfli v0.8.3", "zstd v0.13.3", "zstd-safe v7.3.0", "zstd-sys v2.1.1+zstd.1.5.7"];
+const TESTS = ['config::tests::test_config_parsing_defaults','config::tests::test_config_parsing_overrides','config::tests::test_config_toml_roundtrip','desktop::autostart::tests::test_autostart_query','desktop::discovery::tests::test_progman_discovery','desktop::occlusion::tests::covers_edge_cases','desktop::occlusion::tests::secondary_monitor_with_negative_origin','engine::spec_tests::removed_ids_fall_back_to_the_default','import::tests::labels_by_extension','import::tests::same_name_different_content_does_not_overwrite','lab::tests::overrides_are_clamped','lab::tests::parses_options_and_limits','media::tests::base64_matches_rfc4648','media::tests::friendly_app_names','media::tests::reads_live_session','pause::tests::manual_and_auto_are_independent','pause::tests::options_gate_each_condition','pause::tests::reports_which_condition_fired','render::bloom::tests::bloom_shaders_compile','render::bloom::tests::parses_directive','render::params::tests::parses_and_validates','render::params::tests::retint_directive','render::pipeline::tests::test_all_shaders_compile','studio::window::tests::imported_previews_are_served','studio::window::tests::test_studio_window_creation','system::tests::busy_percent_math','system::tests::json_matches_what_the_page_reads','system::tests::rate_tolerates_counter_reset','system::tests::real_sample_is_plausible','wallpaper::manager::package_tests::entry_cannot_escape_package_dir','wallpaper::manager::tests::test_manager_web_and_shader_switching','wallpaper::web::tests::percent_decode_handles_utf8_and_edges','wallpaper::web::tests::serve_from_dir_blocks_traversal'];
+const ASIDES = ['você ainda está lendo isso?', 'isso está demorando mais que o esperado (como sempre)', 'dica: este é um bom momento para café', 'compilando... não pisque, não vai ajudar', 'o linker está pensando na vida',
+  'se você está lendo isso, o build ainda não acabou', 'sim, são mesmo todos esses crates', 'prometo que é só mais um crate (mentira)', 'rust: segurança de memória; compilação: segurança de tempo livre', 'ainda aqui? o build também', 'ctrl+c não acelera. já testei.', 'o borrow checker aprova este momento de reflexão'];
+const IGNORED = 'media::tests::reads_live_session';
+const WARNINGS = [
+  { msg: 'unused variable: `cafe`', file: 'src\render\bloom.rs', ln: 88, code: '        let cafe = 0; // TODO: remover antes de entregar', col: 13, len: 4, help: 'if this is intentional, prefix it with an underscore: `_cafe`', lint: 'unused_variables' },
+  { msg: 'function `funciona_na_minha_maquina` is never used', file: 'src\desktop\discovery.rs', ln: 140, code: 'fn funciona_na_minha_maquina() -> bool {', col: 3, len: 26, help: '', lint: 'dead_code' },
+  { msg: 'unreachable statement', file: 'src\engine.rs', ln: 512, code: '    println!("isso nunca vai rodar, confia");', col: 5, len: 38, help: 'any code following this expression is unreachable', lint: 'unreachable_code' },
+  { msg: 'unused variable: `scale`', file: 'src\\render\\bloom.rs', ln: 214, code: '        let scale = 0.5;', col: 13, len: 5, help: 'if this is intentional, prefix it with an underscore: `_scale`', lint: 'unused_variables' },
+  { msg: 'unused import: `std::time::Duration`', file: 'src\\system.rs', ln: 9, code: 'use std::time::{Duration, Instant};', col: 16, len: 8, help: '', lint: 'unused_imports' },
+  { msg: 'function `fallback_shader` is never used', file: 'src\\wallpaper\\manager.rs', ln: 36, code: 'fn fallback_shader(device: &ID3D11Device) -> Result<ShaderWallpaper> {', col: 4, len: 15, help: '', lint: 'dead_code' },
+  { msg: 'variable does not need to be mutable', file: 'src\\studio\\window.rs', ln: 188, code: '            let mut rc = RECT::default();', col: 17, len: 6, help: 'remove this `mut`', lint: 'unused_mut' },
+];
+const FORTUNES = ['99 bugs no código. Corrige um, 127 bugs no código.', 'Funciona na minha máquina. (todo dev, minutos antes do incidente)', 'Se está funcionando, não mexe. Se não está, mexe até quebrar de vez.',
+  'Existem 10 tipos de pessoas: as que entendem binário e as que não.', 'Um QA entra num bar e pede -1 cerveja. O bar quebra.', 'Deploy na sexta às 17h: coragem ou ingenuidade?', 'git blame: fui eu. Sempre fui eu.',
+  'Reiniciou? Limpou o cache? Culpou o DNS?', 'O melhor código é o que não foi escrito. O segundo melhor é o que você apagou.', 'Lembrete: beba água. A cafeteira já está em estado crítico.', 'Gatos: 1 · Teclados: 0', 'TODO: apagar este TODO.'];
+const EXTRA_TESTS = ['meta::tests::funciona_na_minha_maquina', 'meta::tests::calculo_da_vida_o_universo_e_tudo_mais', 'meta::tests::so_passa_de_manha', 'meta::tests::nao_deveria_compilar_mas_compila', 'cafe::tests::precisa_de_mais_cafe'];
+const MESSAGES = ['fix: agora vai', 'chore: bump pra ninguém reclamar', 'fix: funciona na minha máquina', 'perf(web): vinil com caches e FPS do Studio', 'feat(system): painel de terminal para o dashboard', 'fix(studio): WebView nasce escondida com a janela', 'refactor(catalog): lista refeita', 'feat(color): rotação de matiz global (retint)', 'chore: atualiza dependências', 'fix(security): confina prévias às pastas de wallpapers'];
+const BRANCHES = ['main', 'main', 'main', 'fix/agora-vai', 'hotfix/sexta-17h', 'feat/terminal-build', 'perf/web-fps', 'fix/studio-hide'];
+const FILES = ['IsNotAEngine.exe', 'assets/wallpapers/common.hlsli', 'assets/wallpapers/fallback.hlsl', 'assets/wallpapers/web/matrix.html', 'assets/wallpapers/web/coding.html', 'assets/wallpapers/web/system.html', 'assets/wallpapers/web/terminal_build.html'];
+
+// ---------- estado ----------
+let rnd = (() => { let a = (Date.now() % 4294967296) >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
+const pick = a => a[Math.floor(rnd() * a.length)];
+const hex = n => Array.from({ length: n }, () => '0123456789abcdef'[Math.floor(rnd() * 16)]).join('');
+const STEPS = ['checkout', 'build', 'test', 'lint', 'package'];
+const lines = [];                 // { ts, segs }
+let live = null;                  // linha de progresso do cargo (atualizada no lugar)
+let run = null, runCount = 140 + Math.floor(rnd() * 40);
+const history = [];                       // execuções anteriores: { n, ok, dur, branch }
+for (let i = 4; i >= 1; i--) history.push({ n: runCount - i + 1, ok: i !== 3, dur: 88000 + Math.floor(rnd() * 40000), branch: pick(BRANCHES) });
+let dirtyLog = true;
+
+const T = (s, c = 't', b = false) => [s, c, b];
+const elapsed = () => run ? (performance.now() - run.start) * SPEED : 0;
+const fmtTs = ms => { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+const fmtDur = ms => ms >= 60000 ? `${Math.floor(ms / 60000)}m ${String(Math.floor(ms % 60000 / 1000)).padStart(2, '0')}s` : (ms / 1000).toFixed(ms >= 10000 ? 0 : 1) + 's';
+function push(segs) { lines.push({ ts: fmtTs(elapsed()), segs }); while (lines.length > 500) lines.shift(); dirtyLog = true; }
+const cargo = (verb, rest, c = 'g') => push([T(verb.padStart(12), c, true), T(' ' + rest)]);
+const sleep = ms => new Promise(r => setTimeout(r, ms / SPEED));
+const visible = () => isHidden() ? new Promise(r => document.addEventListener('visibilitychange', function f() { if (!isHidden()) { document.removeEventListener('visibilitychange', f); r(); } })) : Promise.resolve();
+async function wait(ms) { await visible(); await sleep(ms); }
+const jitter = (a, b) => a + rnd() * (b - a);
+
+function step(name, state) { const s = run.steps.find(x => x.name === name); if (state === 'run') s.t0 = performance.now(); if (state === 'ok' || state === 'fail') s.t1 = performance.now(); s.state = state; }
+const stepMs = s => s.t0 ? ((s.t1 || performance.now()) - s.t0) * SPEED : 0;
+
+// ---------- o pipeline ----------
+async function checkout() {
+  step('checkout', 'run');
+  push([T('$ ', 'g', true), T('git fetch --prune origin', 'b')]); await wait(jitter(500, 900));
+  push([T('From github.com:isnotaengine/isnotaengine')]); await wait(250);
+  push([T('   ' + run.prev + '..' + run.commit + '  ' + run.branch + '    -> origin/' + run.branch, 'd')]); await wait(450);
+  push([T('$ ', 'g', true), T('git checkout --detach ' + run.commit, 'b')]); await wait(jitter(400, 700));
+  push([T('HEAD is now at ' + run.commit + ' ', 'y'), T(run.message)]); await wait(500);
+  step('checkout', 'ok');
+}
+async function build() {
+  step('build', 'run');
+  push([T('$ ', 'g', true), T('cargo build --release', 'b')]); await wait(500);
+  cargo('Updating', '`crates-io` index'); await wait(jitter(500, 900));
+  cargo('Downloaded', `${6 + Math.floor(rnd() * 9)} crates (${(0.8 + rnd() * 2).toFixed(1)} MiB) in ${(0.5 + rnd()).toFixed(2)}s`); await wait(350);
+  const order = CRATES.slice().sort(() => rnd() - 0.5), total = order.length + 1;
+  let done = 0;
+  while (done < order.length) {
+    const burst = 1 + Math.floor(rnd() * 3);
+    for (let k = 0; k < burst && done < order.length; k++, done++) {
+      const name = order[done];
+      cargo('Compiling', name); const next = order.slice(done + 1, done + 3).map(n => n.split(' ')[0]).join(', ');
+      live = [T('    Building'.padStart(12), 'g', true), T(' [' + '='.repeat(Math.floor(done / total * 26)) + '>' + ' '.repeat(26 - Math.floor(done / total * 26)) + '] ' + (done + 1) + '/' + total + ': ' + next)];
+      await visible(); await sleep(jitter(15, 70));
+    }
+    if (rnd() < 0.11) { push([T('# ' + pick(ASIDES), 'd')]); }
+    const heavy = /^(windows|wry|webview2|syn|zip|png)/.test(order[Math.min(done, order.length - 1)]);
+    await wait(heavy ? jitter(500, 1100) : jitter(60, 260));
+  }
+  cargo('Compiling', 'IsNotAEngine v0.1.0 (C:\\dev\\isnotaengine)');
+  live = [T('    Building'.padStart(12), 'g', true), T(' [==========================>] ' + total + '/' + total + ': IsNotAEngine(bin)')];
+  await wait(jitter(2500, 4500));
+  if (rnd() < 0.45 || FORCE === 'warn') {
+    const nw = 1 + Math.floor(rnd() * 2), ws = WARNINGS.slice().sort(() => rnd() - 0.5).slice(0, nw);
+    for (const w of ws) {
+      push([T('warning', 'y', true), T(': ' + w.msg, 't', true)]);
+      push([T('   --> ', 'b', true), T(`${w.file}:${w.ln}:${w.col}`, 'b')]);
+      push([T('    |', 'b', true)]);
+      push([T(String(w.ln).padStart(3) + ' |', 'b', true), T(' ' + w.code)]);
+      push([T('    |', 'b', true), T(' '.repeat(w.col) + '^'.repeat(w.len) + (w.help ? ' help: ' + w.help : ''), 'y', true)]);
+      push([T('    |', 'b', true)]);
+      push([T('    = ', 'b', true), T('note', 't', true), T(': `#[warn(' + w.lint + ')]` on by default')]);
+      push([]); await wait(180);
+    }
+    push([T('warning', 'y', true), T(`: \`IsNotAEngine\` (bin "IsNotAEngine") generated ${nw} warning${nw > 1 ? 's' : ''}`, 't', true)]);
+  }
+  live = null;
+  cargo('Finished', '`release` profile [optimized] target(s) in ' + (stepMs(run.steps[1]) / 1000).toFixed(2) + 's');
+  await wait(600); step('build', 'ok');
+}
+async function test() {
+  step('test', 'run');
+  push([T('$ ', 'g', true), T('cargo test --release', 'b')]); await wait(450);
+  cargo('Compiling', 'IsNotAEngine v0.1.0 (C:\\dev\\isnotaengine)'); await wait(jitter(2500, 4000));
+  cargo('Finished', '`release` profile [optimized] target(s) in ' + (3 + rnd() * 3).toFixed(2) + 's');
+  cargo('Running', 'unittests src\\main.rs (target\\release\\deps\\IsNotAEngine-' + hex(16) + '.exe)'); await wait(500);
+  const extras = rnd() < 0.5 ? EXTRA_TESTS.slice().sort(() => rnd() - 0.5).slice(0, 1 + Math.floor(rnd() * 2)) : [];
+  push([]); push([T('running ' + (TESTS.length + extras.length) + ' tests')]); await wait(250);
+  const fail = (rnd() < 0.07 || FORCE === 'fail') && run.attempt === 1 ? 'render::bloom::tests::parses_directive' : null;
+  const order = TESTS.concat(extras).sort(() => rnd() - 0.5);
+  for (const t of order) {
+    if (t === IGNORED) push([T('test ' + t + ' ... '), T('ignored', 'y')]);
+    else if (t === fail) push([T('test ' + t + ' ... '), T('FAILED', 'r', true)]);
+    else push([T('test ' + t + ' ... '), T('ok', 'g')]);
+    await wait(jitter(50, 260));
+  }
+  push([]);
+  const passed = TESTS.length + extras.length - 1 - (fail ? 1 : 0), secs = (0.6 + rnd() * 0.9).toFixed(2);
+  if (fail) {
+    push([T('failures:')]); push([]);
+    push([T('---- ' + fail + ' stdout ----')]);
+    push([T("thread '" + fail + "' panicked at src\\render\\bloom.rs:402:9:", 'r')]);
+    push([T('assertion `left == right` failed')]); push([T('  left: 0.55')]); push([T(' right: 0.8')]); push([]);
+    push([T('failures:')]); push([T('    ' + fail)]); push([]);
+    push([T('test result: ', 't'), T('FAILED', 'r', true), T(`. ${passed} passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in ${secs}s`)]); push([]);
+    push([T('error', 'r', true), T(': test failed, to rerun pass `--bin IsNotAEngine`', 't', true)]);
+    await wait(900); step('test', 'fail'); return false;
+  }
+  push([T('test result: '), T('ok', 'g', true), T(`. ${passed} passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in ${secs}s`)]);
+  await wait(500); step('test', 'ok'); return true;
+}
+async function lint() {
+  step('lint', 'run');
+  push([T('$ ', 'g', true), T('cargo clippy --all-targets -- -D warnings', 'b')]); await wait(500);
+  for (const c of ['windows v0.62.2', 'wry v0.57.0', 'webview2-com v0.39.1', 'serde_json v1.0.152', 'IsNotAEngine v0.1.0 (C:\\dev\\isnotaengine)']) { cargo('Checking', c); await wait(jitter(400, 1400)); }
+  cargo('Finished', '`dev` profile [unoptimized + debuginfo] target(s) in ' + (9 + rnd() * 8).toFixed(2) + 's'); await wait(450);
+  push([T('$ ', 'g', true), T('cargo fmt --check', 'b')]); await wait(jitter(500, 900));
+  push([T('\u2713', 'g', true), T(' no formatting differences', 'd')]); await wait(450); step('lint', 'ok');
+}
+async function pack() {
+  step('package', 'run');
+  push([T('$ ', 'g', true), T('pwsh scripts\\package.ps1 -Version 0.1.0', 'b')]); await wait(600);
+  for (const f of FILES) { push([T('  adding: ', 'd'), T(f), T(f.endsWith('.exe') ? ' (deflated 58%)' : ' (deflated ' + (50 + Math.floor(rnd() * 30)) + '%)', 'd')]); await wait(jitter(120, 380)); }
+  const size = (3.2 + rnd() * 0.5).toFixed(1);
+  push([T('  sha256  ', 'd'), T(hex(64), 'm')]); await wait(300);
+  push([T('\u2713', 'g', true), T(` IsNotAEngine-0.1.0-win64.zip  ${size} MiB`)]); run.artifact = `IsNotAEngine-0.1.0-win64.zip  ${size} MiB`;
+  await wait(500); step('package', 'ok');
+}
+async function pipeline() {
+  runCount++;
+  while (history.length > 6) history.shift();
+  const failedBefore = run && run.failed;
+  run = { n: runCount, start: performance.now(), commit: hex(7), prev: hex(7), branch: failedBefore ? run.branch : pick(BRANCHES), message: failedBefore ? 'fix: ajusta teste do bloom' : pick(MESSAGES),
+    attempt: failedBefore ? 2 : 1, failed: false, artifact: '', cache: 82 + Math.floor(rnd() * 15), steps: STEPS.map(name => ({ name, state: 'wait', t0: 0, t1: 0 })) };
+  lines.length = 0; live = null; dirtyLog = true;
+  if (run.attempt > 1) push([T('\u21bb retry #' + run.attempt + ' \u00b7 ' + run.branch, 'y', true)]);
+  await checkout(); await build();
+  if (!(await test())) { run.failed = true; for (const s of run.steps) if (s.state === 'wait') s.state = 'skip'; push([]); push([T('\u2717 pipeline failed in ' + fmtDur(elapsed()), 'r', true)]); run.end = elapsed(); history.push({ n: run.n, ok: false, dur: run.end, branch: run.branch }); await wait(9000); return; }
+  await lint(); await pack();
+  run.end = elapsed(); history.push({ n: run.n, ok: true, dur: run.end, branch: run.branch });
+  push([]); push([T('\u2713 pipeline passed', 'g', true), T(' in ' + fmtDur(run.end) + ' \u00b7 5 steps \u00b7 0 failed', 'd')]);
+  push([T('fortune: ', 'f'), T(pick(FORTUNES), 'd')]);
+  await wait(11000);
+}
+(async () => { for (;;) { try { await pipeline(); } catch (e) { await wait(2000); } } })();
+
+// ---------- desenho ----------
+let W = 0, H = 0, D = 1, fs = 16, lh = 24, cw = 9;
+const FONT = (b) => `${b ? 'bold ' : ''}${fs}px "Cascadia Mono", "Cascadia Code", Consolas, monospace`;
+function layout() {
+  D = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * D); cv.height = Math.round(H * D); g.setTransform(D, 0, 0, D, 0, 0);
+  g.textRendering = 'optimizeSpeed'; g.fontKerning = 'none';   // sem ligaturas: `--` não pode virar um travessão
+  fs = Math.max(11, Math.round(H / 52)); g.font = FONT(false); cw = g.measureText('M').width; lh = Math.round(fs * 1.5);
+  g.fillStyle = COL.bg; g.fillRect(0, 0, W, H); dirtyLog = true; paintAll();
+}
+const px = Math.round;
+function segsWidth(segs) { let w = 0; for (const [s, , b] of segs) { g.font = FONT(b); w += g.measureText(s).width; } return w; }
+function drawSegs(segs, x, y, maxX) {
+  for (const [s, c, b] of segs) {
+    g.font = FONT(b); g.fillStyle = colorOf(c);
+    let t = s, w = g.measureText(t).width;
+    if (x + w > maxX) { const keep = Math.max(0, Math.floor((maxX - x) / cw) - 1); t = t.slice(0, keep) + '\u2026'; w = g.measureText(t).width; g.fillText(t, px(x), px(y)); return; }
+    g.fillText(t, px(x), px(y)); x += w;
+  }
+}
+function box(x, y, w, h, title, right) {
+  g.strokeStyle = COL.line; g.lineWidth = 1; g.strokeRect(px(x) + .5, px(y) + .5, px(w) - 1, px(h) - 1);
+  g.font = FONT(false);
+  if (title) { const tw = g.measureText(title).width + cw * 1.2; g.fillStyle = COL.bg; g.fillRect(px(x + cw), px(y - 2), px(tw), 5); g.fillStyle = rgb(COL.g); g.textAlign = 'left'; g.fillText(title, px(x + cw * 1.6), px(y + fs * 0.35)); }
+  if (right) { const rw = g.measureText(right).width + cw * 1.2; g.fillStyle = COL.bg; g.fillRect(px(x + w - cw - rw), px(y - 2), px(rw), 5); g.fillStyle = COL.d; g.textAlign = 'right'; g.fillText(right, px(x + w - cw * 1.6), px(y + fs * 0.35)); g.textAlign = 'left'; }
+}
+// geometria
+function geom() {
+  const padX = Math.round(W * 0.045 / cw) * cw, padY = Math.round(H * 0.06 / lh) * lh;
+  const ax = padX, ay = padY, aw = W - padX * 2, bottom = H - padY - lh * 1.8;
+  const logW = Math.round(aw * 0.68 / cw) * cw, gap = cw * 2;
+  return { ax, ay, aw, bottom, logW, panX: ax + logW + gap, panW: aw - logW - gap, h: bottom - ay };
+}
+
+// Quebra uma linha de segmentos em várias de no máximo `maxCols` caracteres, preferindo espaços; a continuação ganha recuo.
+function wrapLine(segs, maxCols) {
+  const flat = []; segs.forEach(([t, c, b]) => { for (const ch of t) flat.push([ch, c, b]); });
+  if (flat.length <= maxCols) return [segs];
+  const out = []; let start = 0;
+  while (start < flat.length) {
+    const room = out.length ? maxCols - 4 : maxCols; let end = Math.min(flat.length, start + room);
+    if (end < flat.length) { for (let k = end; k > start + room * 0.5; k--) if (flat[k][0] === ' ') { end = k; break; } }
+    const line = out.length ? [T('    ', 'd')] : [];
+    for (const [ch, c, b] of flat.slice(start, end)) { const last = line[line.length - 1]; if (last && last[1] === c && last[2] === b) last[0] += ch; else line.push([ch, c, b]); }
+    out.push(line); start = end; while (start < flat.length && flat[start][0] === ' ') start++;
+  }
+  return out;
+}
+function paintLog() {
+  const G = geom(); g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.fillStyle = COL.bg; g.fillRect(G.ax - 2, G.ay - 8, G.logW + 4, G.h + 12);
+  box(G.ax, G.ay, G.logW, G.h, 'output', run ? `${run.branch} @ ${run.commit}` : '');
+  const padL = cw * 2, rows = Math.max(1, Math.floor((G.h - lh * 1.2) / lh));
+  const tsW = cw * 7, maxCols = Math.max(20, Math.floor((G.logW - padL - tsW - cw * 2.2) / cw));
+  const expanded = []; for (const l of lines.slice(-(rows + 6))) wrapLine(l.segs, maxCols).forEach((segs, i) => expanded.push({ ts: i ? '' : l.ts, segs }));
+  const view = expanded.slice(-(rows - (live ? 1 : 0)));
+  let y = G.ay + lh * 1.5;
+  g.save(); g.beginPath(); g.rect(G.ax + 3, G.ay + 3, G.logW - 6, G.h - 6); g.clip();
+  const all = live ? view.concat([{ ts: fmtTs(elapsed()), segs: live }]) : view;
+  for (const l of all) {
+    g.font = FONT(false); g.fillStyle = COL.f; if (l.ts) g.fillText(l.ts, px(G.ax + padL), px(y));
+    g.fillStyle = COL.line; g.fillRect(px(G.ax + padL + tsW - cw * 0.6), px(y - lh * 0.72), 1, px(lh * 0.95));
+    drawSegs(l.segs, G.ax + padL + tsW + cw * 0.6, y, G.ax + G.logW - cw * 1.5); y += lh;
+  }
+  g.restore(); dirtyLog = false;
+}
+function spinner(cx, cy, r, t) {
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2 - Math.PI / 2, k = ((i - Math.floor(t * 8)) % 8 + 8) % 8, al = 0.15 + 0.85 * (1 - k / 8);
+    g.fillStyle = `rgba(166,227,161,${al})`; g.fillRect(px(cx + Math.cos(a) * r - 1.5), px(cy + Math.sin(a) * r - 1.5), 3, 3);
+  }
+}
+function paintPanel() {
+  const G = geom(); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  g.fillStyle = COL.bg; g.fillRect(G.panX - 2, G.ay - 8, G.panW + 4, G.h + 12);
+  box(G.panX, G.ay, G.panW, G.h, 'pipeline', run ? '#' + run.n : '');
+  if (!run) return;
+  const x = G.panX + cw * 2, w = G.panW - cw * 4; let y = G.ay + lh * 1.7;
+  const kv = (k, v, c = 't') => { g.font = FONT(false); g.fillStyle = COL.d; g.textAlign = 'left'; g.fillText(k, px(x), px(y)); g.fillStyle = colorOf(c); g.textAlign = 'right'; g.fillText(v, px(x + w), px(y)); y += lh; };
+  kv('commit', run.commit, 'y'); kv('branch', run.branch, 'm'); kv('runner', 'ci-win-04'); kv('cache', run.cache + '% hit', 'g');
+  g.textAlign = 'left'; g.fillStyle = COL.d; g.font = FONT(false);
+  const msg = run.message.length * cw > w ? run.message.slice(0, Math.floor(w / cw) - 1) + '\u2026' : run.message; g.fillStyle = COL.t; g.fillText(msg, px(x), px(y)); y += lh * 1.6;
+  const t = performance.now() / 1000; let doneN = 0;
+  for (const s of run.steps) {
+    const cy = y - fs * 0.32;
+    if (s.state === 'ok') { doneN++; g.strokeStyle = rgb(COL.g); g.lineWidth = 2; g.beginPath(); g.moveTo(x + 1, cy); g.lineTo(x + 5, cy + 4); g.lineTo(x + 12, cy - 5); g.stroke(); }
+    else if (s.state === 'fail') { g.strokeStyle = rgb(COL.r); g.lineWidth = 2; g.beginPath(); g.moveTo(x + 1, cy - 5); g.lineTo(x + 11, cy + 5); g.moveTo(x + 11, cy - 5); g.lineTo(x + 1, cy + 5); g.stroke(); }
+    else if (s.state === 'run') spinner(x + 6, cy, 6, t);
+    else { g.strokeStyle = COL.f; g.lineWidth = 1.5; g.beginPath(); g.arc(x + 6, cy, 4.5, 0, Math.PI * 2); g.stroke(); }
+    g.font = FONT(s.state === 'run'); g.textAlign = 'left'; g.fillStyle = s.state === 'wait' || s.state === 'skip' ? COL.f : s.state === 'fail' ? rgb(COL.r) : COL.t; g.fillText(s.name, px(x + cw * 3), px(y));
+    g.font = FONT(false); g.textAlign = 'right'; g.fillStyle = COL.d; g.fillText(s.t0 ? fmtDur(stepMs(s)) : '\u2014', px(x + w), px(y)); y += lh * 1.25;
+  }
+  // progresso geral em LEDs
+  y += lh * 0.3; const cells = 24, cs = w / cells, cur = run.steps.find(s => s.state === 'run');
+  const frac = (doneN + (cur ? 0.5 : 0)) / run.steps.length, lit = Math.round(frac * cells);
+  for (let i = 0; i < cells; i++) { g.fillStyle = i < lit ? rgb(run.failed ? COL.r : mix(COL.g, COL.c, i / cells)) : COL.unlit; g.fillRect(px(x + i * cs), px(y), Math.max(2, px(cs - 2)), px(lh * 0.55)); }
+  y += lh * 1.9;
+  // últimas execuções
+  y += lh * 1.2; g.font = FONT(false); g.textAlign = 'left'; g.fillStyle = COL.d; g.fillText('recentes', px(x), px(y)); y += lh * 1.05;
+  const room = Math.floor((G.ay + G.h - lh * 0.8 - y) / lh);
+  for (const h of history.slice(-Math.max(0, Math.min(5, room - (run.artifact ? 2 : 0)))).reverse()) {
+    const cy = y - fs * 0.32; g.lineWidth = 2; g.strokeStyle = h.ok ? rgb(COL.g) : rgb(COL.r); g.beginPath();
+    if (h.ok) { g.moveTo(x + 1, cy); g.lineTo(x + 4, cy + 3); g.lineTo(x + 10, cy - 4); } else { g.moveTo(x + 1, cy - 4); g.lineTo(x + 9, cy + 4); g.moveTo(x + 9, cy - 4); g.lineTo(x + 1, cy + 4); }
+    g.stroke(); g.textAlign = 'left'; g.fillStyle = COL.d; g.fillText('#' + h.n, px(x + cw * 2.4), px(y));
+    g.fillStyle = COL.f; const br = h.branch.length > 14 ? h.branch.slice(0, 13) + '…' : h.branch; g.fillText(br, px(x + cw * 8), px(y));
+    g.textAlign = 'right'; g.fillStyle = COL.d; g.fillText(fmtDur(h.dur), px(x + w), px(y)); y += lh;
+  }
+  y += lh * 0.4;
+  if (run.artifact) { g.font = FONT(false); g.textAlign = 'left'; g.fillStyle = COL.d; g.fillText('artifact', px(x), px(y)); y += lh; g.fillStyle = rgb(COL.m); const a = run.artifact; g.fillText(a.length * cw > w ? a.slice(0, Math.floor(w / cw) - 1) + '\u2026' : a, px(x), px(y)); }
+}
+const fmtDate = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
+function paintBar() {
+  const G = geom();
+  const by = G.bottom + lh * 1.2; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  g.fillStyle = COL.bg; g.fillRect(G.ax - 2, G.bottom + lh * 0.1, G.aw + 4, lh * 1.8);
+  g.fillStyle = COL.line; g.fillRect(px(G.ax), px(G.bottom + lh * 0.2), px(G.aw), 1);
+  g.font = FONT(true); g.fillStyle = rgb(COL.g); g.fillRect(px(G.ax), px(by - lh * 0.75), px(cw * 6), px(lh * 0.95)); g.fillStyle = '#0b0c11'; g.fillText(' ci ', px(G.ax + cw), px(by));
+  g.font = FONT(false); g.fillStyle = COL.d; g.fillText('0:pipeline', px(G.ax + cw * 8), px(by)); g.fillStyle = COL.t; g.fillText('*', px(G.ax + cw * 18), px(by)); g.fillStyle = COL.d; g.fillText('1:logs-  2:htop', px(G.ax + cw * 20), px(by));
+  const d = new Date(), p2 = n => String(n).padStart(2, '0');
+  g.textAlign = 'right'; g.fillStyle = COL.d; g.fillText(`${fmtDate.format(d)}  \u2502  ${p2(d.getHours())}:${p2(d.getMinutes())}`, px(G.ax + G.aw), px(by));
+}
+function paintAll() { g.fillStyle = COL.bg; g.fillRect(0, 0, W, H); paintLog(); paintPanel(); paintBar(); }
+
+// log: só quando chega linha; painel: 6 Hz (spinner); barra: 1 Hz
+setInterval(() => { if (dirtyLog && !isHidden()) paintLog(); }, 100);
+setInterval(() => { if (!isHidden()) paintPanel(); }, 160);
+setInterval(() => { if (!isHidden()) paintBar(); }, 1000);
+addEventListener('resize', layout);
+layout();
+</script>
+</body>
+</html>

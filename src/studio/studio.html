@@ -1,0 +1,3171 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>IsNotAEngine Studio</title>
+<style>
+  :root {
+    --bg: #0b0b10;
+    --panel: rgba(22, 22, 32, .72);
+    --panel-solid: #15151e;
+    --line: rgba(255, 255, 255, .07);
+    --line-2: rgba(255, 255, 255, .13);
+    --text: #f1eff8;
+    --muted: #9b98ab;
+    --faint: #66637a;
+    --accent: #9d8bff;
+    --accent-ink: #fff;
+    --brand: linear-gradient(120deg, #6b5bff 0%, #c13cff 45%, #ff4d7d 75%, #ff9a3d 100%);
+    --ok: #44e0a5;
+    --warn: #ffbf4d;
+    --radius: 18px;
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; color: var(--text); overflow: hidden; user-select: none; }
+  body {
+    background:
+      radial-gradient(900px 520px at 85% -10%, rgba(193, 60, 255, .13), transparent 60%),
+      radial-gradient(700px 480px at 20% 110%, rgba(255, 94, 138, .08), transparent 60%),
+      var(--bg);
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  ::-webkit-scrollbar { width: 12px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.09); border-radius: 10px; border: 4px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,.16); }
+
+  .app { display: grid; grid-template-columns: 74px 1fr; height: 100%; }
+
+  /* Barra lateral (Left Icon Rail) */
+  .app > aside { background: #0a0a0f; border-right: 1px solid rgba(255,255,255,.06); display: flex; flex-direction: column; align-items: center; padding: 18px 8px 14px; gap: 8px; z-index: 25; }
+  .brand { display: flex; align-items: center; justify-content: center; padding: 0 0 14px; }
+  .brand svg { width: 40px; height: 40px; flex: none; filter: drop-shadow(0 6px 18px rgba(193, 60, 255, .45)); transition: transform .2s; }
+  .brand:hover svg { transform: scale(1.06); }
+  .brand div, .nav-title { display: none; }
+  .nav { position: relative; width: 46px; height: 46px; background: none; border: 0; padding: 0; border-radius: 14px; color: var(--muted); display: grid; place-items: center; transition: background .15s, color .15s, transform .12s; }
+  .nav:hover { background: rgba(255,255,255,.06); color: var(--text); }
+  .nav.active { background: rgba(193, 60, 255, .14); color: #fff; box-shadow: inset 0 0 0 1px rgba(193, 60, 255, .28); }
+  .nav.active::before { content: ""; position: absolute; left: -13px; top: 10px; bottom: 10px; width: 3.5px; border-radius: 0 4px 4px 0; background: linear-gradient(180deg, #7c5cff, #c13cff, #ff5e8a); box-shadow: 0 0 12px rgba(193, 60, 255, .75); }
+  .nav.active svg { color: #fff; }
+  .nav svg { width: 20px; height: 20px; flex: none; }
+  .nav span { position: absolute; left: calc(100% + 14px); top: 50%; transform: translateY(-50%) translateX(-4px); background: #181624; border: 1px solid var(--line-2); color: var(--text); padding: 6px 11px; border-radius: 9px; font-size: 12.5px; font-weight: 600; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s; box-shadow: 0 10px 26px rgba(0,0,0,.7); z-index: 60; }
+  .nav:hover span { opacity: 1; transform: translateY(-50%) translateX(0); }
+  /* Tag IA em amarelo/dourado da paleta do Studio */
+  .nav[data-view="create"]::after { content: "IA"; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%); background: linear-gradient(90deg, #ffd452, #ff9a3d); color: #0b0b10; font-size: 9px; font-weight: 800; letter-spacing: .06em; padding: 1px 5px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.65); }
+  .side-foot { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+  .engine-card { display: none; }
+  .icon-btn { width: 32px; height: 32px; flex: none; border-radius: 9px; border: 0; background: rgba(255,255,255,.06); display: grid; place-items: center; transition: background .15s; }
+  .icon-btn:hover { background: rgba(255,255,255,.14); }
+  .icon-btn svg { width: 14px; height: 14px; }
+  .dock-tabs button:focus-visible, .c-drop-btn:focus-visible, .card:focus-visible, .cat-nav:focus-visible, .icon-btn:focus-visible, .dock-open-btn:focus-visible { outline: none; }
+
+  :root { --dock-w: 316px; --dock-pad: 316px; }
+  body.dock-closed { --dock-pad: 0px; }
+  @media (max-width: 860px) {
+    :root { --dock-pad: 0px; }
+  }
+
+  /* Scrollbars finas e discretas em todo o Studio */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .15); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .28); }
+
+  main { position: relative; overflow-y: auto; overflow-x: hidden; padding: 26px calc(28px + var(--dock-pad)) 48px 32px; transition: padding-right .26s cubic-bezier(.2,.8,.2,1); }
+  .view { display: none; }
+  .view.active { display: block; animation: in .28s ease; }
+  @keyframes in { from { opacity: 0; transform: translateY(6px); } }
+  main.lab-on { padding: 0; overflow: hidden; }
+  #view-lab { height: 100%; }
+  #view-lab iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+  /* Ao Vivo Gigante (100vh) + Rolagem para Galeria Completa abaixo */
+  #view-gallery.active {
+    position: relative;
+    margin: -26px calc(-28px - var(--dock-pad)) -48px -32px;
+  }
+  .hero { position: relative; width: 100%; height: 100vh; min-height: 520px; overflow: hidden; }
+  .gal-main { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 20px calc(22px + var(--dock-pad)) 14px 28px; transition: padding-right .26s cubic-bezier(.2,.8,.2,1); z-index: 2; }
+  .stage {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #050508;
+    border: 0;
+    z-index: 1;
+  }
+  .stage canvas, .stage iframe, .stage video, .stage img.stage-img { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; object-fit: cover; }
+  .stage iframe { pointer-events: none; }
+  /* Vinheta suave atrás do texto e fusão com a galeria completa na borda inferior */
+  .stage::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(8,7,14,.18) 0%, transparent 32%, rgba(8,7,14,.22) 62%, rgba(11,11,16,.88) 92%, #0b0b10 100%),
+      linear-gradient(90deg, rgba(8,7,14,.68) 0%, rgba(8,7,14,.22) 45%, transparent 78%);
+  }
+  .stage-top { display: none; }
+  @keyframes live { 50% { opacity: .35; } }
+
+  /* Bloco esquerdo sobre o Ao Vivo (limpo e direto) */
+  .info { position: relative; z-index: 3; margin: auto 0 12px; max-width: 500px; pointer-events: auto; }
+  .eyebrow { font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: #ff85a8; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,.85); }
+  .info h1 { margin: 4px 0 6px; font-size: clamp(24px, 2.8vw, 38px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.04; text-transform: uppercase; color: #fff; text-shadow: 0 6px 28px rgba(0,0,0,.9); }
+  .info p { margin: 0; color: rgba(241,239,248,.78); font-size: 12.5px; line-height: 1.45; max-width: 440px; text-shadow: 0 2px 14px rgba(0,0,0,.9); }
+  .badges, .hero-mon-status { display: none !important; }
+  .hero-pills { display: none; }
+  .btn.cta-pill {
+    height: 40px;
+    border-radius: 11px;
+    padding: 0 15px;
+    font-size: 12.5px;
+    font-weight: 600;
+    background: rgba(16, 15, 24, .42);
+    backdrop-filter: blur(8px);
+    color: rgba(255,255,255,.88);
+    border: 1px solid rgba(255,255,255,.10);
+    box-shadow: none;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .btn.cta-pill:hover {
+    background: rgba(255,255,255,.10);
+    border-color: rgba(255,255,255,.18);
+    color: #fff;
+  }
+  .hero-tools { display: inline-flex; align-items: center; gap: 6px; }
+  .hero-tools .btn.tool {
+    width: 36px;
+    height: 36px;
+    flex: none;
+    border-radius: 10px;
+    background: rgba(16, 15, 24, .42);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.10);
+    box-shadow: none;
+    padding: 0 9px;
+  }
+  .hero-tools .btn.tool:hover { background: rgba(255,255,255,.10); border-color: rgba(255,255,255,.18); }
+  .hero-tools .btn.tool.armed { width: auto; }
+
+  /* Rodapé da Tela Inicial:
+     Linha 1: [Aplicar / Em exibição] [Aplicar em todos] (esquerda) + [Buscar] [Ícone de Filtro] (direita)
+     Linha 2: Carrossel horizontal com setas pequenas e discretas */
+  .hero-bottom {
+    position: relative;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+  .bottom-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+  .cta-zone { display: flex; align-items: center; gap: 8px; flex: none; }
+  .btn.cta-primary {
+    min-width: 148px;
+    height: 40px;
+    border-radius: 11px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .01em;
+    background: linear-gradient(125deg, #6b5bff 0%, #c13cff 52%, #ff4d7d 100%);
+    border: 1px solid rgba(255,255,255,.16);
+    color: #fff;
+    box-shadow: 0 10px 24px -8px rgba(193, 60, 255, .45);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: transform .15s, filter .15s, background .15s;
+  }
+  .btn.cta-primary svg { width: 16px; height: 16px; flex: none; }
+  .btn.cta-primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .btn.cta-primary.is-live {
+    background: rgba(16, 15, 24, .45);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(192, 132, 252, .32);
+    color: #f3e8ff;
+    box-shadow: none;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .cta-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #c084fc; box-shadow: 0 0 8px #c084fc; flex: none; animation: live 1.6s ease-in-out infinite; }
+
+  /* Busca transparente + Botão de Ícone de Filtro com Popover */
+  .cat-filters { display: flex; align-items: center; gap: 7px; flex-wrap: nowrap; margin-left: auto; min-width: 0; }
+  .c-drop { position: relative; user-select: none; flex: none; }
+  .filter-icon-btn {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(16, 15, 24, .42);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.10);
+    color: rgba(255,255,255,.78);
+    display: grid;
+    place-items: center;
+    padding: 0;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .filter-icon-btn svg { width: 16px; height: 16px; }
+  .filter-icon-btn:hover, .c-drop.open .filter-icon-btn, .filter-icon-btn.has-filter {
+    background: rgba(255,255,255,.10);
+    border-color: rgba(255,255,255,.20);
+    color: #fff;
+  }
+  .filter-icon-btn.has-filter { border-color: rgba(168, 127, 251, .45); color: #d8b4fe; }
+  .filter-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #c13cff;
+    box-shadow: 0 0 6px #c13cff;
+    display: none;
+  }
+  .filter-icon-btn.has-filter .filter-dot { display: block; }
+  .filter-popover {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    width: 264px;
+    max-height: 340px;
+    overflow-y: auto;
+    background: rgba(16, 15, 24, .92);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 20px 50px -10px rgba(0,0,0,.85);
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 80;
+  }
+  .c-drop.open .filter-popover { display: flex; animation: popUp .14s cubic-bezier(.2,.8,.2,1); }
+  @keyframes popUp { from { opacity: 0; transform: translateY(5px) scale(.98); } }
+  .fp-sec { display: flex; flex-direction: column; gap: 6px; }
+  .fp-head { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+  .fp-clear { background: none; border: 0; padding: 0; font-size: 10.5px; color: #c084fc; cursor: pointer; font-weight: 600; }
+  .fp-clear:hover { text-decoration: underline; }
+  .fp-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .fp-chip {
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.04);
+    color: var(--muted);
+    padding: 4px 9px;
+    border-radius: 8px;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: .12s;
+  }
+  .fp-chip:hover { background: rgba(255,255,255,.09); color: #fff; }
+  .fp-chip.active { background: rgba(139, 92, 246, .28); border-color: rgba(168, 127, 251, .5); color: #fff; font-weight: 600; }
+  .fp-chip em { font-style: normal; font-size: 10px; opacity: .6; font-variant-numeric: tabular-nums; }
+
+  .cat-filters .search-wrap { position: relative; flex: none; }
+  .cat-filters .search-wrap svg { position: absolute; left: 10px; top: 50%; width: 13px; height: 13px; transform: translateY(-50%); color: rgba(255,255,255,.48); pointer-events: none; z-index: 2; }
+  .cat-filters .search {
+    height: 36px;
+    background: rgba(16, 15, 24, .42);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.10);
+    box-shadow: none;
+    border-radius: 10px;
+    padding: 0 10px 0 28px;
+    color: #fff;
+    font: inherit;
+    font-size: 12px;
+    width: 124px;
+    outline: none;
+    transition: width .18s, border-color .15s, background .15s;
+  }
+  .cat-filters .search::placeholder { color: rgba(255,255,255,.45); }
+  .cat-filters .search:focus {
+    background: rgba(16, 15, 24, .65);
+    border-color: rgba(168, 127, 251, .45);
+    width: 164px;
+  }
+
+  /* Carrossel no bottom com setas pequenas e discretas */
+  .cat-carousel { position: relative; display: flex; align-items: flex-start; gap: 6px; width: 100%; min-width: 0; }
+  .cat-nav {
+    width: 26px;
+    height: 26px;
+    margin-top: 38px;
+    flex: none;
+    border-radius: 8px;
+    background: rgba(16, 15, 24, .32);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,.07);
+    color: rgba(255,255,255,.45);
+    opacity: .55;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    transition: opacity .15s, background .15s, border-color .15s, color .15s;
+  }
+  .cat-nav:hover {
+    opacity: 1;
+    background: rgba(255,255,255,.10);
+    border-color: rgba(255,255,255,.18);
+    color: #fff;
+  }
+  .cat-nav svg { width: 14px; height: 14px; }
+
+  .grid {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    padding: 6px 4px 6px;
+  }
+  .grid::-webkit-scrollbar { display: none; }
+  .card {
+    flex: 0 0 156px;
+    width: 156px;
+    background: none;
+    border: 0;
+    padding: 0;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .thumb {
+    position: relative;
+    width: 100%;
+    height: 88px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #08080c;
+    border: 1.5px solid rgba(255,255,255,.12);
+    transition: transform .2s cubic-bezier(.2,.8,.2,1), border-color .2s, box-shadow .2s;
+  }
+  .thumb canvas, .thumb video, .thumb img.thumb-img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .thumb iframe { position: absolute; left: 0; top: 0; width: 640px; height: 400px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .thumb .ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); font-size: 12px; letter-spacing: .12em; background: radial-gradient(circle at 30% 20%, #23203a, #0d0d13 70%); }
+  .thumb::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 55%, rgba(5,5,10,.65)); }
+  .t-badge { display: none; }
+  .card-meta { display: flex; flex-direction: column; padding: 0 2px; }
+  .card-meta b { font-weight: 600; font-size: 11.5px; line-height: 1.25; color: rgba(255,255,255,.88); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-meta span { display: none; }
+  .card:hover .thumb { transform: translateY(-2px); border-color: rgba(255,255,255,.32); }
+  /* Card em execução no(s) monitor(es) SEMPRE tem borda de destaque na lista */
+  .card.running .thumb { border-color: #c084fc; box-shadow: 0 0 0 2px #a855f7, 0 8px 20px -6px rgba(168, 85, 247, .55); }
+  .card.running .card-meta b { color: #e9d5ff; font-weight: 700; }
+  /* Card selecionado atualmente na prévia */
+  .card.sel .thumb { border-color: #f472b6; box-shadow: 0 0 0 2px #d946ef, 0 10px 24px -6px rgba(217, 70, 239, .65); }
+  .card.sel .card-meta b { color: #fff; font-weight: 700; }
+  .pin { position: absolute; right: 6px; top: 6px; z-index: 2; display: flex; gap: 3px; }
+  .pin i { font-style: normal; width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; font-weight: 800; background: rgba(10,10,16,.75); backdrop-filter: blur(4px); color: #fff; border: 1px solid rgba(255,255,255,.14); padding: 0; }
+  .pin i.on { background: linear-gradient(135deg, #6b5bff, #c13cff); border-color: transparent; box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+  .empty { color: var(--faint); padding: 24px 16px; text-align: center; width: 100%; }
+
+  /* Dica sutil de rolar para ver o catálogo completo + Seção de Galeria Completa abaixo do palco */
+  .scroll-cue {
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: -2px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: none;
+    border: 0;
+    color: rgba(255,255,255,.38);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .02em;
+    transition: color .15s, transform .15s;
+  }
+  .scroll-cue:hover { color: rgba(255,255,255,.85); transform: translateY(1px); }
+  .scroll-cue svg { width: 13px; height: 13px; }
+
+  .full-gallery {
+    position: relative;
+    z-index: 3;
+    background: var(--bg);
+    padding: 28px calc(28px + var(--dock-pad)) 64px 32px;
+    transition: padding-right .26s cubic-bezier(.2,.8,.2,1);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    border-top: 1px solid rgba(255,255,255,.05);
+  }
+  .fg-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 6px;
+  }
+  .fg-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .fg-title { display: flex; align-items: baseline; gap: 10px; }
+  .fg-title h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+  .fg-title span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .fg-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fg-search-wrap { position: relative; }
+  .fg-search-wrap svg { position: absolute; left: 10px; top: 50%; width: 13px; height: 13px; transform: translateY(-50%); color: rgba(255,255,255,.45); pointer-events: none; }
+  .fg-search {
+    height: 34px;
+    width: 180px;
+    border-radius: 9px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.09);
+    padding: 0 10px 0 28px;
+    color: #fff;
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+    transition: border-color .15s, background .15s, width .18s;
+  }
+  .fg-search:focus { border-color: rgba(168, 127, 251, .45); background: rgba(255,255,255,.06); width: 220px; }
+  .fg-filters-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .fg-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(226px, 1fr));
+    gap: 16px;
+  }
+  .fg-card {
+    background: rgba(255,255,255,.022);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 14px;
+    padding: 8px 8px 11px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    transition: transform .18s cubic-bezier(.2,.8,.2,1), border-color .18s, background .18s, box-shadow .18s;
+  }
+  .fg-card:hover {
+    transform: translateY(-3px);
+    background: rgba(255,255,255,.042);
+    border-color: rgba(255,255,255,.16);
+    box-shadow: 0 16px 36px -14px rgba(0,0,0,.75);
+  }
+  .fg-card .thumb {
+    height: 124px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .fg-card:hover .thumb { transform: none; }
+  .fg-card.running { border-color: rgba(168, 85, 247, .55); box-shadow: 0 0 0 1px rgba(168, 85, 247, .35), 0 12px 28px -10px rgba(168, 85, 247, .35); }
+  .fg-card.sel { border-color: rgba(217, 70, 239, .65); box-shadow: 0 0 0 1px rgba(217, 70, 239, .45), 0 14px 30px -10px rgba(217, 70, 239, .42); }
+  .fg-type-tag {
+    position: absolute;
+    left: 7px;
+    bottom: 7px;
+    z-index: 2;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: rgba(10, 10, 16, .72);
+    backdrop-filter: blur(6px);
+    color: rgba(255,255,255,.86);
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  .fg-meta { display: flex; flex-direction: column; gap: 3px; padding: 0 3px; flex: 1; }
+  .fg-meta-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .fg-meta-top b { font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fg-meta-top small { font-size: 10.5px; color: #c084fc; font-weight: 600; flex: none; }
+  .fg-meta span { font-size: 11.5px; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .fg-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 3px 0; margin-top: auto; }
+  .fg-btn {
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.85);
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    transition: .14s;
+  }
+  .fg-btn:hover { background: rgba(255,255,255,.10); color: #fff; border-color: rgba(255,255,255,.20); }
+  .fg-btn.apply {
+    flex: 1;
+    background: linear-gradient(125deg, rgba(107,91,255,.22), rgba(193,60,255,.22));
+    border-color: rgba(168,127,251,.32);
+    color: #f3e8ff;
+  }
+  .fg-btn.apply:hover {
+    background: linear-gradient(125deg, #6b5bff, #c13cff);
+    border-color: transparent;
+    color: #fff;
+  }
+  .fg-btn.apply.is-live {
+    background: rgba(168, 85, 247, .14);
+    border-color: rgba(168, 85, 247, .35);
+    color: #d8b4fe;
+  }
+
+  /* Barra Lateral Direita Encaixada */
+  .dock {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--dock-w);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    background: #100f18;
+    border-left: 1px solid rgba(255,255,255,.07);
+    padding: 14px 5px 16px 14px;
+    z-index: 30;
+    transition: transform .26s cubic-bezier(.2,.8,.2,1);
+  }
+  body.dock-closed .dock { transform: translateX(100%); pointer-events: none; }
+  /* Botão de engrenagem transparente quando a barra lateral está recolhida */
+  .dock-open-btn {
+    position: fixed;
+    top: 16px;
+    right: 18px;
+    z-index: 29;
+    display: none;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 10px;
+    background: rgba(16, 15, 24, .42);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.10);
+    color: rgba(255,255,255,.82);
+    place-items: center;
+    transition: border-color .15s, background .15s, color .15s, transform .15s;
+  }
+  .dock-open-btn:hover {
+    background: rgba(255,255,255,.10);
+    border-color: rgba(255,255,255,.20);
+    color: #fff;
+    transform: rotate(22deg);
+  }
+  .dock-open-btn svg { width: 17px; height: 17px; }
+  body.dock-closed .dock-open-btn { display: grid; }
+  .dock-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 10px; margin-right: 9px; border-bottom: 1px solid rgba(255,255,255,.06); flex: none; }
+  .dock-av { position: relative; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #231d38, #14131d); border: 1px solid rgba(168,127,251,.25); display: grid; place-items: center; flex: none; }
+  .dock-av svg { width: 16px; height: 16px; color: #c4b5fd; }
+  .dock-av i { position: absolute; right: -1px; bottom: -1px; width: 8.5px; height: 8.5px; border-radius: 50%; background: var(--ok); border: 2px solid #100f18; }
+  .dock-av.paused i { background: var(--warn); }
+  .dock-user { flex: 1; min-width: 0; }
+  .dock-user b { display: block; font-size: 12.5px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dock-user small { display: block; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dock-tabs { display: grid; grid-template-columns: repeat(3, 1fr); margin-right: 9px; background: rgba(0,0,0,.36); border: 1px solid rgba(255,255,255,.06); border-radius: 9px; padding: 3px; gap: 3px; flex: none; }
+  .dock-tabs button { background: none; border: 0; border-radius: 6px; padding: 6px 4px; font-size: 11px; font-weight: 600; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 4px; transition: .15s; position: relative; }
+  .dock-tabs button:hover { color: var(--text); }
+  .dock-tabs button.active { background: rgba(255,255,255,.09); color: #fff; }
+  .dock-tabs button.active::after { content: ""; position: absolute; bottom: 0; left: 26%; right: 26%; height: 2px; border-radius: 2px; background: var(--brand); }
+  .dock-body { flex: 1; min-height: 0; width: 100%; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 2px 9px 20px 0; }
+  .dock-body::-webkit-scrollbar { width: 5px; }
+  .dock-body::-webkit-scrollbar-track { background: transparent; }
+  .dock-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 999px; }
+  .dock-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.28); }
+  .dock-pane { display: none; flex: none; flex-direction: column; align-items: stretch; width: 100%; gap: 10px; }
+  .dock-pane.active { display: flex; }
+  .dock h3 { margin: 4px 2px 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #8c87a3; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .dock h3 span { font-weight: 500; color: var(--muted); font-size: 10.5px; text-transform: none; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+  .dock h3 span:empty { display: none; }
+  .monitors { position: relative; flex: none; width: 100%; height: 104px; border-radius: 11px; background: rgba(0,0,0,.32); border: 1px solid rgba(255,255,255,.06); }
+  .mon { position: absolute; border-radius: 7px; border: 1.5px solid rgba(255,255,255,.12); background: linear-gradient(160deg, #201f2d, #161520); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1px; font-size: 10.5px; color: var(--muted); cursor: pointer; padding: 3px; overflow: hidden; transition: border-color .15s, box-shadow .15s; }
+  .mon b { font-size: 14px; color: var(--text); font-weight: 700; }
+  .mon span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .mon.small span { display: none; }
+  .mon:hover { border-color: rgba(255,255,255,.28); }
+  .mon.sel { border-color: #8b5cf6; box-shadow: 0 0 0 2px rgba(139, 92, 246, .22); background: linear-gradient(160deg, #27203d, #171526); }
+  .actions { display: flex; gap: 8px; }
+  .tools { display: flex; gap: 8px; }
+  .btn.tool { flex: 1; min-width: 0; height: 38px; padding: 0 10px; }
+  .btn.tool svg { width: 17px; height: 17px; flex: none; }
+  .btn[hidden] { display: none; }
+  .btn.tool .lbl { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .btn.tool .lbl:empty { display: none; }
+  .btn.tool.danger.armed { flex: 3; }
+  .create-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-bottom: 8px; }
+  .create-card { text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); color: var(--text); cursor: pointer; font: inherit; transition: .15s; }
+  .create-card:hover { border-color: var(--line-2); background: rgba(255,255,255,.06); transform: translateY(-1px); }
+  .create-card svg { width: 22px; height: 22px; color: var(--accent); }
+  .create-card b { font-size: 14px; font-weight: 600; }
+  .create-card span { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .mine-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .mine-actions .btn { padding: 5px 11px; font-size: 12px; }
+  .btn.danger { border-color: rgba(255,120,120,.4); color: #ff9a9a; }
+  .btn.danger.armed { background: rgba(255,90,90,.18); color: #fff; }
+  .tune { display: flex; flex-direction: column; gap: 9px; padding: 10px 11px; border-radius: 11px; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.06); }
+  .tune[hidden] { display: none; }
+  .tune-h { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  .tune-h .btn { padding: 3px 9px; font-size: 11px; }
+  .tune-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+  .tune-row label { font-size: 12px; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tune-row output { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 38px; text-align: right; cursor: pointer; }
+  .tune-row output:hover { color: var(--text); }
+  .tune-row small { grid-column: 1 / 3; color: var(--faint); font-size: 10.5px; margin-top: -2px; }
+  .tune-row input[type=range] { grid-column: 1 / 3; width: 100%; height: 4px; margin: 5px 0 2px;
+    background: linear-gradient(90deg, var(--accent) 0 var(--p, 50%), rgba(255,255,255,.12) var(--p, 50%) 100%); }
+  .tune-row input[type=range]::-webkit-slider-thumb { width: 14px; height: 14px; box-shadow: 0 0 0 3px rgba(157,139,255,.28); }
+  .btn { border: 1px solid var(--line-2); background: rgba(255,255,255,.04); border-radius: 10px; padding: 6px 11px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background .15s, transform .1s, filter .15s; }
+  .btn:hover { background: rgba(255,255,255,.08); }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background: linear-gradient(135deg, #6b5bff, #a855f7) border-box; color: #fff; border-color: transparent; font-weight: 600; box-shadow: 0 6px 18px -6px rgba(124, 92, 255, .45); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .chip { border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); color: var(--muted); padding: 4px 9px; border-radius: 999px; font-size: 11px; transition: .15s; }
+  .chip:hover { color: var(--text); border-color: rgba(255,255,255,.18); }
+  .chip.active { background: rgba(139, 92, 246, .26); color: #fff; border-color: rgba(168, 127, 251, .45); font-weight: 600; }
+  .search { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px; color: var(--text); font: inherit; font-size: 12px; width: 210px; outline: none; transition: .15s; }
+  .search:focus { border-color: #8b5cf6; background: rgba(139, 92, 246, .06); }
+
+  /* Secções de configuração (página Criar/Sobre + barra lateral .dock) */
+  .settings { max-width: 820px; margin: 0 auto; display: grid; gap: 10px; }
+  .settings h2 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.03em; }
+  .settings .lead { margin: 0 0 6px; color: var(--muted); font-size: 14px; }
+  .set-hero { display: flex; align-items: center; gap: 16px; padding: 20px 22px; margin-bottom: 4px; border-radius: 22px; border: 1px solid var(--line);
+    background: radial-gradient(500px 200px at 100% 0%, rgba(193,60,255,.18), transparent 70%), radial-gradient(400px 200px at 0% 100%, rgba(255,94,138,.1), transparent 70%), var(--panel); }
+  .set-hero svg { width: 54px; height: 54px; flex: none; filter: drop-shadow(0 8px 20px rgba(193,60,255,.4)); }
+  .set-hero .meta { flex: 1; min-width: 0; }
+  .set-hero .chips2 { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .set-hero .chips2 span { font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid var(--line); color: var(--muted); }
+  .row .lead-ic { width: 38px; height: 38px; flex: none; border-radius: 11px; display: grid; place-items: center; background: rgba(157,139,255,.1); color: var(--accent); border: 1px solid rgba(157,139,255,.16); }
+  .row .lead-ic svg { width: 18px; height: 18px; }
+  .row > div:first-child:has(.lead-ic) { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1; }
+  .row > div:first-child:has(.lead-ic) > div:last-child { min-width: 0; }
+  .row:hover { background: rgba(255,255,255,.015); }
+  .group { overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); backdrop-filter: blur(14px); }
+  .group-title { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin: 16px 4px 2px; font-weight: 600; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 20px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row .t { font-size: 14px; font-weight: 500; }
+  .row .d { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+  .seg { display: inline-flex; background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 11px; padding: 3px; flex: none; }
+  .seg button { background: none; border: 0; padding: 6px 12px; border-radius: 8px; color: var(--muted); font-size: 13px; transition: .15s; }
+  .seg button:hover { color: var(--text); }
+  .seg button.active { background: rgba(255,255,255,.1); color: var(--text); }
+  .switch { position: relative; width: 40px; height: 22px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch span { position: absolute; inset: 0; background: rgba(255,255,255,.12); border-radius: 999px; transition: .2s; cursor: pointer; }
+  .switch span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #d4d2de; transition: .2s cubic-bezier(.3,1.4,.5,1); box-shadow: 0 2px 5px rgba(0,0,0,.45); }
+  .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input[type="range"]:focus-visible, .search:focus-visible, textarea:focus-visible, .cp input.hex:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .switch input:checked + span { background: linear-gradient(135deg, #6b5bff, #9d5cff); }
+  .switch input:checked + span::after { transform: translateX(18px); background: #fff; }
+  input[type=range] { -webkit-appearance: none; width: 100%; height: 4px; border-radius: 4px; background: rgba(255,255,255,.14); outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; background: #fff; cursor: pointer; box-shadow: 0 0 0 3px rgba(139, 92, 246, .35); }
+  .swatches { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; justify-content: flex-start; }
+  .sw { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; outline: 1px solid var(--line-2); cursor: pointer; padding: 0; transition: transform .15s; flex: none; }
+  .sw:hover { transform: scale(1.1); }
+  .sw.active { border-color: var(--bg); outline: 2px solid var(--text); }
+  .sw.auto { background: conic-gradient(#ff7a45, #ff3d7f, #6b5bff, #3dd5ff, #3ddc97, #ff7a45); }
+  .sw.custom { position: relative; background: transparent; border: 2px dashed rgba(255,255,255,.35); outline: none; color: var(--muted); display: grid; place-items: center; font-size: 15px; line-height: 1; }
+  .sw.custom:hover { color: var(--text); border-color: rgba(255,255,255,.6); }
+  .sw.custom.active { border: 2px solid var(--bg); outline: 2px solid var(--text); background: var(--cc, #9d4edd); color: transparent; }
+
+  /* Overrides específicos da gaveta lateral (.dock) — colocados DEPOIS de .group/.row para vencer especificidade! */
+  .dock .group-title { margin: 8px 2px 2px; font-size: 10px; font-weight: 700; letter-spacing: .12em; color: #8c87a3; }
+  .dock .group-title:first-child { margin-top: 2px; }
+  .dock .group { flex: none; width: 100%; box-sizing: border-box; background: rgba(255,255,255,.022); border: 1px solid rgba(255,255,255,.055); border-radius: 11px; backdrop-filter: none; }
+  .dock .row { padding: 8px 11px; gap: 10px; flex-wrap: nowrap; align-items: center; }
+  .dock .row + .row { border-top: 1px solid rgba(255,255,255,.045); }
+  .dock .row.col-row,
+  .dock .row:has(.seg),
+  .dock .row:has(.swatches),
+  .dock .row:has(select),
+  .dock .row:has(input[type=range]) { flex-direction: column; align-items: stretch; gap: 7px; }
+  .dock .row > div:first-child:has(.lead-ic) { display: block; flex: none; }
+  .dock .row .lead-ic { display: none !important; }
+  .dock .row .t { font-size: 12px; font-weight: 600; color: #eceaf6; line-height: 1.3; }
+  .dock .row .d { display: none; }
+  .dock .row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+  .dock .seg { display: flex; width: 100%; box-sizing: border-box; background: rgba(0,0,0,.38); border: 1px solid rgba(255,255,255,.06); border-radius: 8px; padding: 2px; gap: 2px; }
+  .dock .seg button { flex: 1; padding: 5px 4px; font-size: 11px; font-weight: 600; border-radius: 6px; text-align: center; white-space: nowrap; color: var(--muted); }
+  .dock .seg button:hover { color: var(--text); }
+  .dock .seg button.active { background: rgba(255, 255, 255, .13); color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  .dock .swatches { justify-content: space-between; width: 100%; gap: 4px; flex-wrap: nowrap; }
+  .dock .pl-items-box { max-height: 148px; overflow-y: auto; padding: 7px; gap: 4px; border-radius: 8px; background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.05); }
+  .dock .pl-items-box::-webkit-scrollbar { width: 4px; }
+  .dock .pl-items-box::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 999px; }
+  .swatches { position: relative; }
+  .cp { position: fixed; z-index: 1000; width: 224px; padding: 14px; border-radius: 16px; background: rgba(24,24,34,.97); backdrop-filter: blur(18px); border: 1px solid var(--line-2); box-shadow: 0 24px 60px -12px rgba(0,0,0,.85); display: none; flex-direction: column; align-items: center; gap: 13px; user-select: none; }
+  .cp.open { display: flex; }
+  .cp .wheel { position: relative; width: 168px; height: 168px; border-radius: 50%; cursor: crosshair; touch-action: none; }
+  .cp .wheel canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; }
+  .cp .wheel .dim { position: absolute; inset: 0; border-radius: 50%; background: #000; pointer-events: none; }
+  .cp .bri { position: relative; align-self: stretch; height: 12px; border-radius: 7px; cursor: pointer; touch-action: none; background: linear-gradient(to right, #000, var(--bc, #fff)); }
+  .cp .knob { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.5); pointer-events: none; }
+  .cp .bri .knob { top: 50%; }
+  .cp .hexrow { align-self: stretch; display: flex; align-items: center; gap: 10px; }
+  .cp .prev { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-2); flex: none; }
+  .cp input.hex { flex: 1; min-width: 0; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; color: var(--text); font: 13px "Cascadia Code", Consolas, monospace; text-transform: uppercase; outline: none; }
+  .cp input.hex:focus { border-color: var(--accent); }
+  .val { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; width: 48px; text-align: right; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 20px); background: rgba(28,28,40,.92); backdrop-filter: blur(14px); border: 1px solid var(--line-2); padding: 11px 18px; border-radius: 12px; font-size: 13px; opacity: 0; transition: .25s; pointer-events: none; box-shadow: 0 20px 40px -12px rgba(0,0,0,.7); z-index: 30; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  [hidden] { display: none !important; }
+  .ai-box { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+  .ai-box textarea { width: 100%; box-sizing: border-box; min-height: 88px; resize: vertical; background: rgba(255,255,255,.04); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font: inherit; font-size: 14px; line-height: 1.45; outline: none; }
+  .ai-box textarea:focus { border-color: var(--accent); }
+  .ai-box .actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .ai-log { display: flex; flex-direction: column; gap: 10px; padding-bottom: 24px; }
+  .ai-msg { padding: 10px 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); font-size: 14px; line-height: 1.5; white-space: pre-wrap; max-width: 92%; }
+  .ai-msg.me { align-self: flex-end; background: rgba(157,139,255,.12); border-color: rgba(157,139,255,.25); }
+  .ai-msg.err { border-color: rgba(255,120,120,.35); color: #ff9a9a; }
+  .ai-step { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; padding-left: 4px; }
+  .ai-step .mark { width: 14px; text-align: center; }
+  .ai-step .mark.ok { color: var(--ok); } .ai-step .mark.no { color: #ff9a9a; }
+  .ai-step .out { flex-basis: 100%; padding-left: 22px; color: var(--muted); opacity: .85; }
+  .ai-shots { flex-basis: 100%; display: flex; gap: 8px; flex-wrap: wrap; padding-left: 22px; margin-top: 4px; }
+  .ai-shots img { height: 110px; border-radius: 9px; border: 1px solid var(--line); display: block; }
+  .ai-card { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 12px; border-radius: 16px; border: 1px solid rgba(68,224,165,.3); background: rgba(68,224,165,.06); }
+  .lim { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .lim select { padding: 6px 8px; }
+  select, input[type=number] { color-scheme: dark; }
+  select option { background: #1b1b27; color: #ecebf5; }
+  .lim input.search { width: 110px; }
+  input[type=number].search { -moz-appearance: textfield; }
+  .ai-card.draft { border-color: rgba(255,191,77,.35); background: rgba(255,191,77,.06); }
+  .ai-card img { width: 168px; height: 94px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
+  .ai-card .ph { width: 168px; height: 94px; border-radius: 10px; background: rgba(255,255,255,.05); display: grid; place-items: center; font-size: 12px; color: var(--muted); }
+  .ai-card .meta { flex: 1; min-width: 160px; display: grid; gap: 2px; }
+  .ai-card .meta small { color: var(--muted); font-size: 11.5px; word-break: break-all; }
+  .ai-card .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  /* Criar com IA: a conversa ocupa a tela; a configuração fica numa gaveta aberta pela engrenagem */
+  #view-ai.active { display: block; }
+  .ai-page { display: flex; flex-direction: column; gap: 14px; height: calc(100vh - 76px); min-height: 460px; max-width: 1100px; margin: 0 auto; }
+  .ai-head { display: flex; align-items: center; gap: 14px; }
+  .ai-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .ai-title h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
+  .ai-who { font-size: 12.5px; color: var(--muted); }
+  .ai-who.off { color: #ffbf4d; }
+  .btn.icon { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; flex: none; }
+  .btn.icon svg { width: 20px; height: 20px; }
+  .ai-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); overflow: hidden; }
+  .ai-chat .ai-log { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px 12px; align-content: start; }
+  .ai-chat .ai-empty { margin: auto; max-width: 420px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .ai-chat .ai-box { border: 0; border-top: 1px solid var(--line); border-radius: 0; background: rgba(0,0,0,.18); }
+  .ai-chat .ai-box textarea { min-height: 64px; max-height: 180px; }
+  .ai-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(6,6,10,.55); backdrop-filter: blur(3px); }
+  .ai-drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 61; width: min(420px, 100vw); display: flex; flex-direction: column; overflow: hidden;
+    background: var(--panel-solid); border-left: 1px solid var(--line-2); box-shadow: -30px 0 80px -30px rgba(0,0,0,.9); animation: drawer-in .22s ease; }
+  .ai-drawer[hidden], .ai-scrim[hidden] { display: none; }
+  @keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } }
+  .ai-drawer-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .ai-drawer-head h3 { margin: 0; font-size: 17px; }
+  /* O corpo rola sozinho: a janela pode ser baixa e nada fica escondido */
+  .ai-drawer-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px 20px 28px; display: grid; gap: 0; align-content: start; }
+  .dsec { display: grid; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .dsec:last-child { border-bottom: 0; }
+  .dsec[hidden] { display: none; }
+  .dsec .dt { font-size: 13.5px; font-weight: 600; }
+  .dsec .d { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .dsec .seg { justify-self: start; }
+  .dsec .ai-row-inputs { justify-content: flex-start; }
+  .dsec .ai-row-inputs .search { width: auto; flex: 1; min-width: 0; }
+  .dsec .btn { justify-self: start; }
+  .ai-limits { display: flex; gap: 14px; flex-wrap: wrap; }
+  .ai-limits .search { width: 110px; min-width: 0; }
+  .dline { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
+  .dmore summary { cursor: pointer; font-size: 12.5px; color: var(--accent); user-select: none; }
+  .dmore[open] summary { margin-bottom: 8px; }
+  /* Assistente de primeira configuração (mesmo jeito do tour) */
+  .wiz { width: min(560px, 94vw); gap: 14px; }
+  .wiz-top { display: flex; align-items: center; justify-content: space-between; }
+  .wiz-top .dots { flex: none; }
+  .wiz-step { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .wiz h3 { font-size: 22px; letter-spacing: -0.02em; }
+  .wiz p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+  .wiz ol { margin: 0; padding-left: 20px; color: var(--muted); font-size: 13.5px; line-height: 1.75; }
+  .wiz ol b, .wiz p b { color: var(--text); font-weight: 600; }
+  .wiz-opts { display: grid; gap: 10px; }
+  .wiz-opt { text-align: left; display: grid; gap: 3px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255,255,255,.03); color: var(--text); font: inherit; cursor: pointer; transition: .15s; }
+  .wiz-opt:hover { border-color: var(--line-2); }
+  .wiz-opt.sel { border-color: var(--accent); background: rgba(157,139,255,.1); }
+  .wiz-opt b { font-size: 14px; }
+  .wiz-opt span { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .wiz-url { display: flex; gap: 8px; align-items: center; }
+  .wiz-url code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 9px 12px; }
+  .wiz input.search { width: 100%; box-sizing: border-box; }
+  .wiz-foot { align-items: center; }
+  .wiz-foot .skip { margin-right: auto; background: none; border: 0; color: var(--faint); font-size: 12.5px; padding: 8px 6px; }
+  .wiz-foot .skip:hover { color: var(--text); }
+  .wiz-note { font-size: 12px !important; color: var(--faint) !important; }
+  .wiz-err { color: #ff9a9a !important; }
+  .draft-row .t small { color: var(--faint); font-weight: 400; margin-left: 6px; }
+  .toolbar { align-items: flex-start; }
+  .toolbar h2 { padding-top: 5px; }
+  .filters { flex: 1; min-width: 0; display: grid; gap: 8px; }
+  .filters .chips { flex: none; }
+  .chip.type { padding: 5px 12px; font-size: 12.5px; }
+  .ai-usage { font-size: 12px; color: var(--muted); padding-left: 4px; }
+  .ai-row-inputs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .ai-row-inputs .search { width: 260px; }
+  .modal { position: fixed; inset: 0; display: none; place-items: center; background: rgba(6,6,10,.7); backdrop-filter: blur(6px); z-index: 20; }
+  .modal.open { display: grid; }
+  .modal-box { width: min(720px, 92vw); background: var(--panel-solid); border: 1px solid var(--line-2); border-radius: 22px; padding: 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 40px 100px -30px rgba(0,0,0,.9); }
+  .modal-box h3 { margin: 0; font-size: 18px; }
+  .modal-box .d { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .modal-box code { background: rgba(0,0,0,.35); padding: 1px 5px; border-radius: 5px; }
+  .modal-box textarea { height: 300px; resize: vertical; background: rgba(0,0,0,.35); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font: 12.5px/1.45 "Cascadia Code", Consolas, monospace; white-space: pre; outline: none; }
+  .modal-box textarea:focus { border-color: var(--accent); }
+  .modal-box .actions { justify-content: flex-end; }
+  .st-err { color: #ff8a9a; font-size: 12.5px; min-height: 16px; white-space: pre-wrap; }
+  .drop { position: fixed; inset: 0; display: none; place-items: center; background: rgba(8,8,12,.85); border: 2px dashed var(--accent); border-radius: 22px; margin: 12px; font-size: 18px; z-index: 10; }
+  body.dragging .drop { display: grid; }
+
+  /* Em uso por monitor */
+  .inuse { display: flex; flex-direction: column; gap: 4px; flex: none; width: 100%; margin: -2px 0 0; }
+  .use-row { display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid transparent; border-radius: 10px; background: rgba(255,255,255,.02); text-align: left; transition: background .15s, border-color .15s; }
+  .use-row:hover { background: rgba(255,255,255,.05); }
+  .use-row.sel { background: rgba(139, 92, 246, .14); border-color: rgba(168, 127, 251, .28); }
+  .use-row i { font-style: normal; width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: rgba(255,255,255,.07); }
+  .use-row.sel i { background: linear-gradient(135deg, #6b5bff, #c13cff); color: #fff; }
+  .use-row div { min-width: 0; flex: 1; }
+  .use-row b { display: block; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .use-row small { display: block; font-size: 10.5px; color: var(--faint); }
+  .chip em { font-style: normal; opacity: .5; margin-left: 6px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+  /* Tour de boas-vindas */
+  .tour { position: fixed; inset: 0; z-index: 40; display: none; }
+  .tour.open { display: block; }
+  .tour-hole { position: fixed; border-radius: 18px; box-shadow: 0 0 0 200vmax rgba(5,5,10,.74); outline: 2px solid rgba(157,139,255,.85); outline-offset: 4px;
+    transition: left .4s cubic-bezier(.3,.8,.2,1), top .4s cubic-bezier(.3,.8,.2,1), width .4s cubic-bezier(.3,.8,.2,1), height .4s cubic-bezier(.3,.8,.2,1), outline-color .3s; pointer-events: none; }
+  .tour-hole.none { outline-color: transparent; }
+  .tour-card { position: fixed; width: 340px; background: rgba(22,22,32,.96); border: 1px solid var(--line-2); border-radius: 20px; padding: 20px 20px 16px;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,.9); backdrop-filter: blur(20px); transition: left .4s cubic-bezier(.3,.8,.2,1), top .4s cubic-bezier(.3,.8,.2,1), opacity .25s; }
+  .tour-card.center { width: 420px; text-align: center; padding: 30px 30px 20px; }
+  .tour-card .logo { display: none; width: 76px; height: 76px; margin: 0 auto 14px; filter: drop-shadow(0 12px 30px rgba(193,60,255,.45)); }
+  .tour-card.center .logo { display: block; }
+  .tour-card .step { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .tour-card h3 { margin: 6px 0 8px; font-size: 19px; letter-spacing: -0.02em; }
+  .tour-card.center h3 { font-size: 24px; }
+  .tour-card p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+  .tour-foot { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
+  .tour-card.center .tour-foot { justify-content: center; }
+  .dots { display: flex; gap: 5px; flex: 1; }
+  .tour-card.center .dots { flex: none; margin-right: auto; }
+  .dots i { width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.18); transition: width .25s, background .25s; }
+  .dots i.on { width: 18px; background: var(--accent); }
+  .tour .btn { padding: 8px 14px; font-size: 13px; }
+  .tour .skip { background: none; border: 0; color: var(--faint); font-size: 12.5px; padding: 8px 6px; }
+  .tour .skip:hover { color: var(--text); }
+
+  /* Sobre */
+  .about { max-width: 820px; margin: 0 auto; display: grid; gap: 14px; }
+  .about-hero { position: relative; overflow: hidden; text-align: center; padding: 44px 24px 36px; border-radius: 26px; border: 1px solid var(--line);
+    background: radial-gradient(600px 260px at 50% 0%, rgba(193,60,255,.22), transparent 70%), radial-gradient(500px 240px at 50% 120%, rgba(255,94,138,.16), transparent 70%), var(--panel); }
+  .about-hero svg { width: 96px; height: 96px; filter: drop-shadow(0 18px 40px rgba(193,60,255,.5)); }
+  .about-hero h2 { margin: 16px 0 4px; font-size: 32px; font-weight: 700; letter-spacing: -0.03em; }
+  .about-hero h2 em { font-style: normal; background: var(--brand); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .about-hero p { margin: 0 auto; max-width: 520px; color: var(--muted); font-size: 14.5px; line-height: 1.6; }
+  .about-hero .ver { display: inline-block; margin-top: 16px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.05); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .about-hero .actions { justify-content: center; margin-top: 20px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  .stat b { display: block; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .about-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .about-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
+  .about-card h3 { margin: 0 0 12px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+  .about-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; font-size: 13.5px; color: var(--muted); }
+  .about-card li { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: baseline; line-height: 1.5; }
+  .about-card li b { color: var(--text); font-weight: 500; }
+  kbd { font: 11.5px "Cascadia Code", Consolas, monospace; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line-2); background: rgba(255,255,255,.06); color: var(--text); }
+  .about-foot { text-align: center; font-size: 12px; color: var(--faint); padding: 6px 0 4px; }
+  @media (max-width: 900px) { .stats { grid-template-columns: repeat(2, 1fr); } .about-cols { grid-template-columns: 1fr; } }
+
+  @media (max-width: 760px) {
+    main { padding: 18px 16px 40px; }
+  }
+</style>
+</head>
+<body class="dock-closed">
+<div class="app">
+  <aside>
+    <div class="brand" title="IsNotAEngine Studio"><svg aria-hidden="true" viewBox="0 0 256 256"> <defs> <linearGradient id="lgT" x1="0" y1="0" x2="0.4" y2="1"> <stop offset="0" stop-color="#231a46"/><stop offset="1" stop-color="#0b0b14"/> </linearGradient> <radialGradient id="lgG" cx="0.59" cy="0.42" r="0.42"> <stop offset="0" stop-color="#ff7a59" stop-opacity=".55"/><stop offset="1" stop-color="#ff7a59" stop-opacity="0"/> </radialGradient> <linearGradient id="lgS" x1="0" y1="0" x2="0" y2="1"> <stop offset="0" stop-color="#ffd27a"/><stop offset="1" stop-color="#ff5e7e"/> </linearGradient> <linearGradient id="lg1" x1="0" y1="0" x2="1" y2="0"> <stop offset="0" stop-color="#5b4bff"/><stop offset="1" stop-color="#9a6bff"/> </linearGradient> <linearGradient id="lg2" x1="0" y1="0" x2="1" y2="0"> <stop offset="0" stop-color="#c13cff"/><stop offset="1" stop-color="#ff3d8b"/> </linearGradient> <linearGradient id="lg3" x1="0" y1="0" x2="1" y2="0"> <stop offset="0" stop-color="#ff4d6d"/><stop offset="1" stop-color="#ff9a3d"/> </linearGradient> <clipPath id="lgC"><rect x="8" y="8" width="240" height="240" rx="58"/></clipPath> </defs> <rect x="8" y="8" width="240" height="240" rx="58" fill="url(#lgT)"/> <g clip-path="url(#lgC)"> <rect width="256" height="256" fill="url(#lgG)"/> <circle cx="152" cy="110" r="40" fill="url(#lgS)"/> <path d="M0 150 C 40 122, 86 122, 128 146 S 214 172, 256 140 V256 H0Z" fill="url(#lg1)"/> <path d="M0 180 C 46 156, 96 160, 136 182 S 214 204, 256 178 V256 H0Z" fill="url(#lg2)"/> <path d="M0 212 C 52 192, 104 198, 146 214 S 220 230, 256 212 V256 H0Z" fill="url(#lg3)"/> </g> <rect x="9" y="9" width="238" height="238" rx="57" fill="none" stroke="#ffffff" stroke-opacity=".10" stroke-width="2"/> </svg><div><b>IsNot<em>A</em>Engine</b><small>Studio</small></div></div>
+    <div class="nav-title">Explorar</div>
+    <button class="nav active" data-view="gallery">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5.5v-6h-5v6H4a1 1 0 0 1-1-1v-9.5z"/></svg>
+      <span>Início · Galeria</span></button>
+    <button class="nav" data-view="create">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l1.9 4.8L18.7 9.7l-4.8 1.9L12 16.4l-1.9-4.8L5.3 9.7l4.8-1.9z"/><path d="M19 16v4M17 18h4"/></svg>
+      <span>Criar &amp; IA</span></button>
+    <button class="nav" data-view="lab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/></svg>
+      <span>Shader Lab</span></button>
+    <button class="nav" data-view="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+      <span>Ajustes</span></button>
+    <div class="side-foot">
+      <button class="nav" data-view="about">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+        <span>Sobre</span></button>
+      <div class="engine-card" hidden>
+        <div class="status" id="status"><b><i></i><span>Rodando</span></b><small id="statusFps"></small></div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <section class="view active" id="view-gallery">
+      <div class="hero">
+        <div class="stage" id="stage"></div>
+        <div class="gal-main">
+          <div class="stage-top">
+            <div class="stage-top-left">
+              <span class="page-h">IsNotAEngine</span>
+              <span class="tag" id="stageTag">Prévia ao vivo</span>
+            </div>
+          </div>
+
+          <div class="info">
+            <div class="eyebrow" id="dCat"></div>
+            <h1 id="dTitle"></h1>
+            <p id="dDesc"></p>
+            <div class="badges" id="dBadges" hidden></div>
+            <div class="hero-mon-status" id="heroMonStatus" hidden><i></i><span id="heroMonStatusTxt">Tela 1</span></div>
+          </div>
+
+          <div class="hero-bottom">
+            <div class="bottom-head">
+              <div class="cta-zone">
+                <button class="btn cta-primary" id="applyBtn">Aplicar</button>
+                <button class="btn cta-pill" id="applyAllBtn" title="Aplicar em todos os monitores">Aplicar em todos</button>
+                <div class="hero-tools">
+                  <button class="btn tool" id="freezeBtn" hidden title="Congelar em 4K: renderiza este shader como imagem estática, igual na tela e com 0% de GPU" aria-label="Congelar em 4K"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/></svg></button>
+                  <button class="btn tool" id="renameBtn" hidden title="Renomear este wallpaper" aria-label="Renomear este wallpaper"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
+                  <button class="btn tool danger" id="removeBtn" hidden title="Remover (vai para a Lixeira)" aria-label="Remover este wallpaper"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg><span class="lbl"></span></button>
+                </div>
+              </div>
+              <div class="cat-filters">
+                <div class="search-wrap">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                  <input class="search" id="search" placeholder="Buscar…" spellcheck="false">
+                </div>
+                <div class="c-drop" id="filterDrop">
+                  <button type="button" class="filter-icon-btn" id="filterBtn" title="Filtrar por tipo e categoria" aria-label="Filtrar catálogo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    <i class="filter-dot" id="filterDot"></i>
+                  </button>
+                  <div class="filter-popover" id="filterPopover">
+                    <div class="fp-sec">
+                      <div class="fp-head"><span>Tipo</span><button type="button" class="fp-clear" id="filterClearBtn" hidden>Limpar</button></div>
+                      <div class="fp-chips" id="typeDropMenu"></div>
+                    </div>
+                    <div class="fp-sec">
+                      <div class="fp-head"><span>Categoria</span></div>
+                      <div class="fp-chips" id="catDropMenu"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="cat-carousel">
+              <button class="cat-nav" id="catPrev" title="Passar para a esquerda" aria-label="Anterior">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <div class="grid" id="grid"></div>
+              <button class="cat-nav" id="catNext" title="Passar para a direita" aria-label="Próximo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+            <button type="button" class="scroll-cue" id="scrollDownBtn" title="Rolar para ver o catálogo completo em grade">
+              <span>Explorar catálogo em grade</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="full-gallery" id="fullGallery">
+        <div class="fg-toolbar">
+          <div class="fg-head">
+            <div class="fg-title">
+              <h2>Catálogo Completo</h2>
+              <span id="fgCount"></span>
+            </div>
+            <div class="fg-controls">
+              <div class="chips" id="typeChips"></div>
+              <div class="fg-search-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input class="fg-search" id="fgSearch" placeholder="Buscar no catálogo…" spellcheck="false">
+              </div>
+              <button type="button" class="btn" id="backToStageBtn" title="Voltar ao palco ao vivo">↑ Palco</button>
+            </div>
+          </div>
+          <div class="fg-filters-row">
+            <div class="chips" id="chips"></div>
+          </div>
+        </div>
+        <div class="fg-grid" id="fullGrid"></div>
+      </div>
+    </section>
+
+    <button class="dock-open-btn" id="dockOpenBtn" title="Painel e configurações" aria-label="Abrir configurações">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+
+    <aside class="dock" id="rightDock" aria-label="Painel de telas e configurações">
+      <div class="dock-head">
+        <div class="dock-av" id="dockAv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><i></i></div>
+        <div class="dock-user">
+          <b id="dockStatusTitle">Motor Ativo</b>
+          <small id="dockStatusSub">DirectX 11 · Online</small>
+        </div>
+        <button class="icon-btn" id="pauseBtn" title="Pausar / Retomar motor"></button>
+        <button class="icon-btn" id="dockSsBtn" title="Iniciar proteção de tela viva agora" aria-label="Iniciar proteção de tela">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </button>
+        <button class="icon-btn" id="dockCloseBtn" title="Recolher barra lateral" aria-label="Recolher barra lateral">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7l5 5-5 5M6 17V7"/></svg>
+        </button>
+      </div>
+      <div class="dock-tabs">
+        <button class="active" data-dtab="monitors" title="Telas, aparência e interação da cena">Telas &amp; Cena</button>
+        <button data-dtab="rotation" title="Proteção de tela, Playlist e Agenda">Rotação</button>
+        <button data-dtab="settings" title="Desempenho, energia e sistema">Motor</button>
+      </div>
+      <div class="dock-body">
+        <div class="dock-pane active" id="dpane-monitors">
+          <h3>Disposição das Telas <span id="monHint"></span></h3>
+          <div class="monitors" id="monitors"></div>
+          <h3>Ativo por Monitor</h3>
+          <div class="inuse" id="inUse"></div>
+          <div class="tune" id="tune" hidden aria-label="Ajustes do wallpaper selecionado"></div>
+
+          <div class="group-title">Cena &amp; Interação</div>
+          <div class="group">
+            <div class="row col-row" title="Multiplicador de tempo dos shaders.">
+              <div class="row-top"><div class="t">Velocidade das animações</div><span class="val" id="speedVal" style="width:auto;font-size:11.5px"></span></div>
+              <input type="range" id="speed" min="0.1" max="3" step="0.05">
+            </div>
+            <div class="row col-row" title="Automático mantém as cores originais de cada wallpaper.">
+              <div class="t">Cor de destaque</div>
+              <div class="swatches" id="swatches"></div>
+            </div>
+            <div class="row" title="Camadas seguem levemente o cursor."><div><div class="t">Parallax com o mouse</div><div class="d">Camadas seguem levemente o cursor.</div></div>
+              <label class="switch"><input type="checkbox" id="parallax"><span></span></label></div>
+            <div class="row" title="Shaders interativos reagem ao cursor."><div><div class="t">Interação com o mouse</div><div class="d">Shaders interativos reagem ao cursor.</div></div>
+              <label class="switch"><input type="checkbox" id="mouse"><span></span></label></div>
+          </div>
+        </div>
+
+        <div class="dock-pane" id="dpane-rotation">
+          <div class="group-title">Proteção de tela viva (Windows)</div>
+          <div class="group" id="screensaverGroup">
+            <div class="row"><div><div class="t">Proteção de tela viva</div><div class="d">Entra em tela cheia animada quando o PC fica ocioso.</div></div>
+              <div style="display:flex;align-items:center;gap:6px"><button class="btn" id="ssTest" style="padding:4px 9px;font-size:11px">Testar</button><label class="switch"><input type="checkbox" id="ssEnabled"><span></span></label></div></div>
+            <div class="row col-row"><div class="t">Ativar após inatividade</div>
+              <div class="seg" id="ssIdle"><button data-v="1">1m</button><button data-v="3">3m</button><button data-v="5">5m</button><button data-v="10">10m</button><button data-v="15">15m</button><button data-v="30">30m</button></div></div>
+            <div class="row col-row"><div class="t">Cena da proteção de tela</div>
+              <select class="search" id="ssWallpaper" style="width:100%;padding:6px 10px"></select></div>
+            <div class="row"><div><div class="t">Exigir senha ao sair</div><div class="d">Trava o Windows (Win + L) ao sair da proteção de tela.</div></div>
+              <label class="switch"><input type="checkbox" id="ssLock"><span></span></label></div>
+          </div>
+
+          <div class="group-title">Playlist e rotação por monitor</div>
+          <div class="group" id="playlistGroup">
+            <div class="row"><div><div class="t">Playlist automática</div><div class="d">Troca o wallpaper sozinho por intervalo.</div></div>
+              <label class="switch"><input type="checkbox" id="plEnabled"><span></span></label></div>
+            <div class="row col-row"><div class="t">Trocar a cada</div>
+              <div class="seg" id="plInterval"><button data-v="1">1m</button><button data-v="5">5m</button><button data-v="10">10m</button><button data-v="30">30m</button><button data-v="60">1h</button></div></div>
+            <div class="row"><div><div class="t">Ordem aleatória</div></div>
+              <label class="switch"><input type="checkbox" id="plShuffle"><span></span></label></div>
+            <div class="row col-row"><div class="t">Transição</div>
+              <div class="seg" id="plFade"><button data-v="0">Direta</button><button data-v="600">Rápida</button><button data-v="1200">Suave</button><button data-v="2400">Lenta</button></div></div>
+            <div class="row col-row"><div class="t">Fila configurada para</div>
+              <div class="seg" id="plScope"></div></div>
+            <div class="row col-row">
+              <div class="row-top"><div class="t">Itens da fila</div><small id="plCount" style="color:var(--muted);font-size:10.5px"></small></div>
+              <div class="d" id="plHint">Nenhum marcado = todos os shaders do catálogo.</div>
+              <div class="chips pl-items-box" id="plItems"></div>
+            </div>
+          </div>
+
+          <div class="group-title">Agenda por horário</div>
+          <div class="group" id="scheduleGroup">
+            <div class="row"><div><div class="t">Agenda por horário</div><div class="d">Troca em horários específicos do dia.</div></div>
+              <label class="switch"><input type="checkbox" id="schEnabled"><span></span></label></div>
+            <div class="row col-row">
+              <div class="row-top">
+                <div class="t">Horários</div>
+                <div style="display:flex;gap:5px"><button class="btn" id="schPreset" style="padding:4px 8px;font-size:11px">Dia/Noite</button><button class="btn primary" id="schAdd" style="padding:4px 9px;font-size:11px">+ Horário</button></div>
+              </div>
+              <div id="schSlots" style="display:grid;gap:6px"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dock-pane" id="dpane-settings">
+          <div class="group-title">Desempenho e energia</div>
+          <div class="group">
+            <div class="row col-row" title="Menos quadros, menos GPU.">
+              <div class="t">Taxa de quadros (FPS)</div>
+              <div class="seg" id="fpsSeg"><button data-v="15">15</button><button data-v="30">30</button><button data-v="60">60</button><button data-v="144">144</button></div>
+            </div>
+            <div class="row col-row" title="Consumo mínimo ao jogar em tela cheia.">
+              <div class="t">Modo desempenho</div>
+              <div class="seg" id="perfSeg"><button data-v="off">Desligado</button><button data-v="auto">Auto</button><button data-v="always">Sempre</button></div>
+            </div>
+            <div class="row"><div><div class="t">Pausar quando coberto</div><div class="d">Pausa monitores cobertos por janela maximizada/tela cheia.</div></div>
+              <label class="switch"><input type="checkbox" id="covered"><span></span></label></div>
+            <div class="row"><div><div class="t">Pausar na bateria</div><div class="d">Economiza energia em notebooks.</div></div>
+              <label class="switch"><input type="checkbox" id="battery"><span></span></label></div>
+          </div>
+          <div class="group-title">Sistema</div>
+          <div class="group">
+            <div class="row"><div><div class="t">Wallpaper na tela de bloqueio</div><div class="d">Usa um quadro estático do wallpaper atual.</div></div>
+              <label class="switch"><input type="checkbox" id="lockscreen"><span></span></label></div>
+            <div class="row"><div><div class="t">Iniciar com o Windows</div><div class="d">Abre o motor ao fazer login.</div></div>
+              <label class="switch"><input type="checkbox" id="autostart"><span></span></label></div>
+            <div class="row"><div><div class="t">Mostrar console de log</div><div class="d">Janela de diagnóstico do motor.</div></div>
+              <label class="switch"><input type="checkbox" id="showConsole"><span></span></label></div>
+          </div>
+          <div class="group-title">Dados</div>
+          <div class="group">
+            <div class="row"><div><div class="t">Pasta de dados</div><div class="d">Configuração, cache e importados.</div></div>
+              <button class="btn" id="folderBtn" style="padding:5px 10px;font-size:11.5px">Abrir pasta</button></div>
+            <div class="row"><div><div class="t">Restaurar configuração</div><div class="d">Volta opções aos padrões (salva backup antes).</div></div>
+              <button class="btn" id="resetBtn" style="padding:5px 10px;font-size:11.5px">Restaurar</button></div>
+            <div class="row"><div><div class="t">Tour de boas-vindas</div><div class="d">Rever apresentação do Studio.</div></div>
+              <button class="btn" id="tourBtn" style="padding:5px 10px;font-size:11.5px">Rever tour</button></div>
+            <div class="row col-row"><div><div class="t">Limpar caches</div><div class="d">Libera caches e rascunhos sem apagar wallpapers.</div></div>
+              <div id="dataRows" style="display:grid;gap:6px;margin-top:4px"></div></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="view" id="view-lab"></section>
+
+    <section class="view" id="view-create">
+      <div class="settings">
+        <h2>Criar</h2>
+        <p class="lead">Escolha como fazer o seu wallpaper. Tudo o que você cria ou importa fica na lista "Seus wallpapers" abaixo, onde dá para aplicar, ajustar e remover.</p>
+        <div class="group-title">Como você quer criar?</div>
+        <div class="create-grid" id="createGrid">
+          <button class="create-card" id="ccAi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg><b>Descrever para a IA</b><span>Diga o que você imagina; a IA escreve, olha o resultado e corrige. Usa a sua chave de API.</span></button>
+          <button class="create-card" id="ccLab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg><b>Escrever um shader</b><span>Editor com prévia ao vivo, controles de parâmetros e "Aplicar no desktop".</span></button>
+          <button class="create-card" id="ccShadertoy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 5l-4 14M4 8l-3 4 3 4M20 8l3 4-3 4"/></svg><b>Colar do Shadertoy</b><span>Converte um shader de passe único (sem texturas) e aplica.</span></button>
+          <button class="create-card" id="ccFile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><b>Importar arquivo</b><span>Shader .hlsl, página .html, vídeo, imagem ou pacote .livewallpaper. Também dá para arrastar para a janela.</span></button>
+        </div>
+        <div class="group-title">Modelos para começar</div>
+        <div class="create-grid" id="tplGrid"><span class="d" style="color:var(--faint);font-size:12px">Carregando modelos…</span></div>
+        <div class="group-title">Seus wallpapers</div>
+        <div class="group" id="mine"></div>
+        <div id="draftsWrap" hidden>
+          <div class="group-title">Rascunhos da IA</div>
+          <p class="d" style="margin:0 4px 6px;color:var(--muted);font-size:12.5px">Códigos que a IA gerou e que não chegaram a ser salvos como wallpaper (ficam os 20 mais recentes). Importe o que gostar.</p>
+          <div class="group" id="drafts"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-ai">
+      <div class="ai-page">
+        <header class="ai-head">
+          <button class="btn" id="aiBack" aria-label="Voltar para Criar">← Criar</button>
+          <div class="ai-title"><h2>Criar com IA</h2><span class="ai-who" id="aiWho"></span></div>
+          <button class="btn icon" id="aiGear" aria-label="Configurações da IA" aria-expanded="false" title="Configurações: provedor, chave, modelo e limites">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0-4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          </button>
+        </header>
+        <div class="ai-chat">
+          <div class="ai-log" id="aiLog"></div>
+        <div class="ai-box">
+          <textarea id="aiPrompt" placeholder="Ex.: oceano à noite com lua cheia, ondas lentas, tons de azul&#10;Ou: relógio minimalista com a data e a música que está tocando"></textarea>
+          <div class="actions"><button class="btn primary" id="aiGo">Gerar</button><button class="btn" id="aiStop" hidden>Cancelar</button><button class="btn" id="aiNew" title="Esquece a conversa e começa do zero">Nova conversa</button></div>
+        </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-settings" hidden>
+      <svg id="setLogo"></svg><div id="setChips"></div>
+    </section>
+    <section class="view" id="view-about">
+      <div class="about">
+        <div class="about-hero">
+          <svg id="aboutLogo"></svg>
+          <h2>IsNot<em>A</em>Engine</h2>
+          <p>Engine nativa de wallpapers animados para Windows. Shaders HLSL na GPU, páginas web e vídeos no desktop, com pouco consumo e sem precisar de internet.</p>
+          <span class="ver" id="aboutVer"></span>
+          <div class="actions">
+            <button class="btn primary" id="aboutTour">Rever o tour</button>
+            <button class="btn" id="aboutFolder">Abrir pasta de dados</button>
+          </div>
+        </div>
+        <div class="stats" id="aboutStats"></div>
+        <div class="about-cols">
+          <div class="about-card"><h3>Como funciona</h3><ul>
+            <li><b>Shader</b><span>Desenhado direto na GPU (DirectX 11), em tempo real.</span></li>
+            <li><b>Web</b><span>Páginas locais, isoladas e sem acesso à rede.</span></li>
+            <li><b>Vídeo</b><span>Importe pelo Studio ou arraste o arquivo para a janela.</span></li>
+            <li><b>Economia</b><span>Pausa sozinho quando algo cobre a tela ou na bateria.</span></li>
+          </ul></div>
+          <div class="about-card"><h3>Dicas rápidas</h3><ul>
+            <li><b>Bandeja</b><span>Clique direito no ícone, perto do relógio, para pausar ou trocar de wallpaper.</span></li>
+            <li><b>Lab</b><span>Escreva seu shader com prévia ao vivo e aplique no desktop.</span></li>
+            <li><b>Shadertoy</b><span>Cole um shader de passe único e converta.</span></li>
+            <li><b>Tour</b><span>Reveja a apresentação em Ajustes, em Dados.</span></li>
+          </ul></div>
+        </div>
+        <div class="about-foot">© IsNotAEngine · todos os direitos reservados</div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="modal" id="impModal" role="dialog" aria-modal="true" aria-labelledby="impTitle">
+  <div class="modal-box">
+    <h3 id="impTitle">Esta página roda código no seu computador</h3>
+    <p class="d"><b id="impName"></b> é uma página (HTML/JavaScript) ou um pacote. Ela <b>não tem acesso à internet</b> nem aos seus arquivos, e recebe só o áudio que está tocando, mas pode usar bastante processador e placa de vídeo. Importe somente o que veio de alguém em quem você confia.</p>
+    <div class="actions">
+      <button class="btn" id="impCancel">Cancelar</button>
+      <button class="btn primary" id="impOk">Importar e aplicar</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="stModal">
+  <div class="modal-box">
+    <h3>Importar do Shadertoy</h3>
+    <p class="d">Cole o código da aba <b>Image</b> (a função <code>mainImage</code>). Só shaders de passe único, sem texturas (<code>iChannel</code>). Mantenha os créditos do autor.</p>
+    <input class="search" id="stTitle" placeholder="Nome do wallpaper" spellcheck="false" style="width:100%">
+    <textarea id="stCode" spellcheck="false" placeholder="void mainImage( out vec4 fragColor, in vec2 fragCoord ) { ... }"></textarea>
+    <div class="st-err" id="stErr"></div>
+    <div class="actions">
+      <button class="btn" id="stCancel">Cancelar</button>
+      <button class="btn primary" id="stImport">Converter e aplicar</button>
+    </div>
+  </div>
+</div>
+<div class="drop">Solte para importar (imagem, .hlsl, .glsl, .html, vídeo, .livewallpaper)</div>
+<div class="toast" id="toast"></div>
+<div class="ai-scrim" id="aiScrim" hidden></div>
+<aside class="ai-drawer" id="aiDrawer" hidden role="dialog" aria-label="Configurações da IA">
+  <div class="ai-drawer-head"><h3>Configurações da IA</h3><button class="btn icon" id="aiDrawerClose" aria-label="Fechar">✕</button></div>
+  <div class="ai-drawer-body">
+    <section class="dsec">
+      <div class="dt">Provedor</div>
+      <div class="seg" id="aiProv"><button data-v="claude">Claude</button><button data-v="gemini">Gemini</button><button data-v="openrouter">OpenRouter</button></div>
+      <details class="dmore"><summary>O que é enviado</summary><div class="d" id="aiPrivacy"></div></details>
+    </section>
+    <section class="dsec">
+      <div class="dt">Chave de API</div>
+      <div class="d" id="aiKeyState"></div>
+      <div class="ai-row-inputs"><input class="search" id="aiKey" type="password" placeholder="Cole a chave aqui" autocomplete="off" spellcheck="false"><button class="btn" id="aiKeySave">Salvar</button><button class="btn" id="aiKeyDel" hidden>Remover</button></div>
+      <button class="btn" id="aiWizOpen">Configurar passo a passo</button>
+    </section>
+    <section class="dsec">
+      <div class="dt">Modelo</div>
+      <div class="d" id="aiModelHint">Escolha da lista ou digite o nome. "Atualizar lista" mostra os que a sua conta pode usar.</div>
+      <div class="ai-row-inputs"><input class="search" id="aiModel" list="aiModels" spellcheck="false"><datalist id="aiModels"></datalist><button class="btn" id="aiRefresh">Atualizar lista</button></div>
+    </section>
+    <section class="dsec">
+      <div class="dt">Limites de uma geração</div>
+      <div class="ai-limits">
+        <label class="lim">Rodadas <input class="search" id="aiSteps" type="number" min="1" max="100" step="1" inputmode="numeric" aria-label="Limite de rodadas por geração"></label>
+        <label class="lim">Tokens (em mil) <input class="search" id="aiTokens" type="number" min="10" max="10000" step="10" inputmode="numeric" aria-label="Limite de tokens por geração, em milhares"></label>
+      </div>
+      <div class="d" id="aiLimitsNow"></div>
+      <div class="d">Escolha o quanto a IA pode gastar de uma vez (de 1 a 100 rodadas; de 10 mil a 10 milhões de tokens). Ao passar de qualquer um, a geração para sozinha e você continua de onde parou com um clique.</div>
+      <details class="dmore"><summary>Como os tokens contam</summary><div class="d" id="aiLimitsHint">Contam o que o modelo <b>lê</b> (a conversa e as imagens são reenviadas a cada rodada) mais o que escreve. É um limite de <b>uso</b>, não um teto de dinheiro: o preço por token depende do modelo e do provedor, e a cobrança aparece só no painel dele.</div></details>
+    </section>
+    <section class="dsec" id="aiVisionRow" hidden>
+      <div class="dline"><div><div class="dt">O modelo entende imagens</div><div class="d">Desligado, a IA recebe só as métricas e não vê o que renderizou. Se o modelo der erro com imagens, desligue.</div></div>
+        <label class="switch"><input type="checkbox" id="aiVision" checked><span></span></label></div>
+    </section>
+  </div>
+</aside>
+
+<div class="modal" id="renModal" role="dialog" aria-modal="true" aria-labelledby="renTitle">
+  <div class="modal-box" style="width:min(460px,92vw)">
+    <h3 id="renTitle">Renomear wallpaper</h3>
+    <p class="d">O nome aparece no Studio e no menu da bandeja. O arquivo no disco não muda. Deixe vazio para voltar ao nome do arquivo.</p>
+    <input class="search" id="renInput" maxlength="60" spellcheck="false" autocomplete="off" style="width:100%;box-sizing:border-box" aria-label="Novo nome">
+    <div class="actions"><button class="btn" id="renCancel">Cancelar</button><button class="btn primary" id="renOk">Salvar</button></div>
+  </div>
+</div>
+<div class="modal" id="aiWiz" role="dialog" aria-modal="true" aria-labelledby="wizTitle">
+  <div class="modal-box wiz">
+    <div class="wiz-top"><span class="wiz-step" id="wizStep"></span><div class="dots" id="wizDots"></div></div>
+    <h3 id="wizTitle"></h3>
+    <div id="wizBody"></div>
+    <div class="actions wiz-foot">
+      <button class="skip" id="wizSkip">Agora não</button>
+      <button class="btn" id="wizBack">Voltar</button>
+      <button class="btn primary" id="wizNext">Próximo</button>
+    </div>
+  </div>
+</div>
+<div class="tour" id="tour">
+  <div class="tour-hole" id="tourHole"></div>
+  <div class="tour-card" id="tourCard">
+    <div class="logo" id="tourLogo"></div>
+    <div class="step" id="tourStep"></div>
+    <h3 id="tourTitle"></h3>
+    <p id="tourText"></p>
+    <div class="tour-foot">
+      <div class="dots" id="tourDots"></div>
+      <button class="skip" id="tourSkip">Pular</button>
+      <button class="btn" id="tourBack">Voltar</button>
+      <button class="btn primary" id="tourNext">Próximo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const INIT = window.__ENGINE_INIT__ || { config: {}, monitors: [], catalog: [] };
+const config = INIT.config;
+let monitors = INIT.monitors || [];
+const catalog = (INIT.catalog || []).map(e => ({ ...e, path: e.id }));
+const ACCENTS = ['auto', '#FF7A45', '#FF3D7F', '#9D4EDD', '#4D8BFF', '#00D2FF', '#3DDC97', '#FFFFFF'];
+const LEGACY = {};   // aliases de nomes antigos (a lista de wallpapers foi refeita)
+
+const $ = s => document.querySelector(s);
+const send = msg => window.ipc && window.ipc.postMessage(JSON.stringify(msg));
+const stem = p => (p || '').split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
+const kindOf = p => /\.(mp4|webm|wmv|mov|avi|mkv)$/i.test(p) ? 'video' : /\.html?$/i.test(p) ? 'web'
+  : /\.livewallpaper$/i.test(p) ? 'pacote' : /\.hlsl$/i.test(p) ? 'shader'
+  : /\.(png|jpe?g|bmp|webp|tiff?)$/i.test(p) ? 'imagem' : 'pasta';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+// Tipo de prévia: 'shader' (frames do motor), 'web' (iframe), 'video' ou null (sem prévia).
+const look = e => e.kind !== 'imported' ? e.kind : ({ shader: 'shader', web: 'web', pasta: 'web', video: 'video', imagem: 'imagem' })[e.ext] || null;
+const frameSrc = e => e.kind === 'shader' ? `/frame/${e.id}?` : `/imp/frame?path=${encodeURIComponent(e.path)}&`;
+const fileSrc = p => '/imp/file/' + p.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/');
+const pageSrc = e => e.kind === 'web' ? `/web/${e.id}` : fileSrc(e.ext === 'pasta' ? e.path + '/index.html' : e.path);
+function pageFrame(e) {
+  const f = document.createElement('iframe');
+  // Importados rodam isolados (origem opaca): sem acesso ao Studio nem ao IPC.
+  if (e.kind === 'imported') f.setAttribute('sandbox', 'allow-scripts');
+  f.src = pageSrc(e);
+  f.setAttribute('tabindex', '-1');
+  return f;
+}
+function imageEl(e, cls) {
+  const i = document.createElement('img');
+  i.className = cls; i.decoding = 'async'; i.loading = 'lazy'; i.draggable = false;
+  i.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover';
+  i.src = fileSrc(e.file || e.path);
+  i.onerror = () => i.remove();   // formatos que o navegador não exibe (ex.: TIFF) ficam só com o fundo
+  return i;
+}
+function videoEl(e, autoplay) {
+  const v = document.createElement('video');
+  v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'metadata';
+  v.src = fileSrc(e.file || e.path);
+  if (autoplay) v.autoplay = true;
+  else v.addEventListener('loadedmetadata', () => { v.currentTime = Math.min(1, (v.duration || 2) / 2); }, { once: true });
+  return v;
+}
+
+// Wallpapers importados (fora do catálogo) aparecem na galeria como "Importados".
+function entryFor(spec) {
+  // Endereços da internet não são mais wallpapers (config antiga): ficam fora da galeria e das prévias.
+  if (!spec || /^[a-z][a-z0-9+.-]*:\/\//i.test(spec)) return null;
+  const id = LEGACY[stem(spec)] || stem(spec);
+  return catalog.find(e => e.id === spec || e.id === id) || addImported(spec);
+}
+function addImported(path, title) {
+  let e = catalog.find(x => x.path === path);
+  if (!e) {
+    e = { id: 'imp:' + path, path, title: (config.wallpaper_titles || {})[path] || title || stem(path), category: 'Importados', kind: 'imported', ext: kindOf(path), audio: false,
+          description: 'Arquivo importado: ' + path };
+    catalog.push(e);
+  }
+  return e;
+}
+
+// Wallpapers que o usuário criou/importou em sessões anteriores (a pasta de importados), na galeria desde a abertura.
+for (const it of INIT.imported || []) addImported(it.path, it.title);
+// Vídeos de fábrica (pasta `videos` do app): o id `video:<nome>` é o que vai para o motor; `file` serve a prévia.
+for (const v of INIT.factory || []) catalog.push({ id: v.id, path: v.id, file: v.file, title: v.title, category: v.category, description: v.description, kind: 'video', ext: 'video', audio: false });
+
+const state = {
+  selected: null,
+  monitor: monitors.length ? monitors[0].id : 0,
+  active: {},
+  category: 'Todos',
+  type: 'todos',
+  query: '',
+  paused: false,
+};
+for (const m of monitors) {
+  const spec = (config.monitor_wallpapers || {})[m.id];
+  state.active[m.id] = entryFor(spec);
+}
+
+/* ---------- Visibilidade: nada anima com a janela escondida/minimizada ---------- */
+// O motor esconde a WebView ao minimizar/fechar; a página então fica `document.hidden`.
+// Laços de prévia esperam aqui e iframes web são descarregados (e remontados ao voltar).
+const visWaiters = [];
+function whenVisible() {
+  return document.hidden ? new Promise(r => visWaiters.push(r)) : Promise.resolve();
+}
+function suspendIframes(on) {
+  document.querySelectorAll('iframe').forEach(f => {
+    if (on) { if (f.src && !f.src.startsWith('about:')) { f.dataset.src = f.src; f.src = 'about:blank'; } }
+    else if (f.dataset.src) { f.src = f.dataset.src; delete f.dataset.src; }
+  });
+}
+document.addEventListener('visibilitychange', () => {
+  suspendIframes(document.hidden);
+  if (!document.hidden) {
+    visWaiters.splice(0).forEach(r => r());
+    // Re-observa os cards: iframes web visíveis na grade são recriados pelo IntersectionObserver
+    if (typeof io !== 'undefined') document.querySelectorAll('.card, .fg-card').forEach(c => { io.unobserve(c); io.observe(c); });
+  }
+});
+
+/* ---------- Renderização de prévias ---------- */
+// Frames de shader vêm do motor (o mesmo HLSL do desktop) como RGBA cru.
+let tintQuery = '';
+function updateTintQuery() {
+  const t = config.tint || 'auto';
+  if (/^#[0-9a-f]{6}$/i.test(t)) {
+    const n = parseInt(t.slice(1), 16);
+    tintQuery = `&r=${((n >> 16) & 255) / 255}&g=${((n >> 8) & 255) / 255}&b=${(n & 255) / 255}`;
+  } else tintQuery = '';
+}
+/* Valores de parâmetros do usuário (`// param:`) por wallpaper: a prévia usa os mesmos que o desktop. */
+config.shader_params = config.shader_params || {};
+const paramQuery = e => {
+  const v = e.kind === 'shader' ? config.shader_params[e.path] : null;
+  const pairs = v ? Object.entries(v).map(([k, x]) => `${k}:${x}`) : [];
+  return pairs.length ? '&p=' + encodeURIComponent(pairs.join(',')) : '';
+};
+const niceName = n => n.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+const fmtNum = x => { const s = Math.abs(x) >= 10 ? x.toFixed(0) : Math.abs(x) >= 1 ? x.toFixed(2) : x.toFixed(3); return s.includes('.') ? s.replace(/\.?0+$/, '') : s; };
+let tuneSend = 0;
+function renderTune(e) {
+  const box = $('#tune');
+  box.textContent = '';
+  const ps = (e && e.kind === 'shader' && e.params) || [];
+  box.hidden = !ps.length;
+  if (!ps.length) return;
+  const mine = config.shader_params[e.path] || (config.shader_params[e.path] = {});
+  const head = document.createElement('div'); head.className = 'tune-h';
+  const title = document.createElement('span'); title.textContent = 'Ajustes';
+  const reset = document.createElement('button'); reset.className = 'btn'; reset.textContent = 'Padrões';
+  reset.setAttribute('aria-label', 'Voltar os ajustes de ' + e.title + ' aos padrões');
+  reset.onclick = () => { delete config.shader_params[e.path]; send({ action: 'reset_shader_params', spec: e.path }); renderTune(e); };
+  head.append(title, reset); box.appendChild(head);
+  for (const p of ps) {
+    const id = 'tune_' + p.name;
+    const val = Number.isFinite(mine[p.name]) ? Math.min(p.max, Math.max(p.min, mine[p.name])) : p.default;
+    const row = document.createElement('div'); row.className = 'tune-row';
+    // O nome no código é inglês (`rain`, `mist`); a descrição do `// param:` é o rótulo em português.
+    const label = p.description || niceName(p.name);
+    const pct = x => Math.round((x - p.min) / ((p.max - p.min) || 1) * 100);
+    const lb = document.createElement('label'); lb.htmlFor = id; lb.textContent = label; lb.title = label;
+    const out = document.createElement('output'); out.htmlFor = id;
+    out.title = 'Clique para voltar ao padrão';
+    const r = document.createElement('input'); r.type = 'range'; r.id = id; r.min = p.min; r.max = p.max;
+    r.step = (p.max - p.min) / 200; r.value = val;
+    r.setAttribute('aria-label', label);
+    const show = x => { out.textContent = pct(x) + '%'; r.style.setProperty('--p', pct(x) + '%'); r.setAttribute('aria-valuetext', pct(x) + '%'); };
+    show(val);
+    r.oninput = () => {
+      const x = +r.value; mine[p.name] = x; show(x);
+      const now = performance.now();
+      if (now - tuneSend > 60) { tuneSend = now; send({ action: 'set_shader_param', spec: e.path, name: p.name, value: x }); }
+    };
+    r.onchange = () => send({ action: 'set_shader_param', spec: e.path, name: p.name, value: +r.value });   // valor final sempre chega
+    out.onclick = () => { r.value = p.default; mine[p.name] = p.default; show(p.default); send({ action: 'set_shader_param', spec: e.path, name: p.name, value: p.default }); };
+    row.append(lb, out, r); box.appendChild(row);
+  }
+}
+
+async function drawFrame(canvas, e, t) {
+  const w = canvas.width, h = canvas.height;
+  try {
+    const res = await fetch(`${frameSrc(e)}w=${w}&h=${h}&t=${t.toFixed(3)}${tintQuery}${paramQuery(e)}`);
+    if (!res.ok) return false;
+    const buf = new Uint8ClampedArray(await res.arrayBuffer());
+    if (buf.length !== w * h * 4) return false;
+    canvas.getContext('2d').putImageData(new ImageData(buf, w, h), 0, 0);
+    return true;
+  } catch { return false; }
+}
+
+function webFrame(e, w) {
+  const f = pageFrame(e);
+  f.style.transform = `scale(${w / 640})`;
+  return f;
+}
+
+// Palco: anima o shader selecionado buscando frames em sequência.
+const stage = $('#stage');
+let stageToken = 0;
+function setStage(entry) {
+  const token = ++stageToken;
+  stage.querySelectorAll('canvas, iframe, video, img.stage-img, .ph').forEach(n => n.remove());
+  const tag = $('#stageTag');
+  const kind = look(entry), imp = entry.kind === 'imported' ? ' · importado' : '';
+  if (kind === 'shader') {
+    const c = document.createElement('canvas');
+    c.width = 768; c.height = 432;
+    stage.prepend(c);
+    tag.textContent = 'Prévia ao vivo · shader' + imp;
+    const t0 = performance.now();
+    (async function loop() {
+      while (token === stageToken) {
+        const start = performance.now();
+        await whenVisible();
+        if (token !== stageToken) break;
+        await drawFrame(c, entry, 6 + (performance.now() - t0) / 1000 * (config.speed || 1));
+        await new Promise(r => setTimeout(r, Math.max(0, 40 - (performance.now() - start))));
+      }
+    })();
+  } else if (kind === 'web') {
+    const f = pageFrame(entry);
+    f.style.cssText = 'width:200%;height:200%;transform:scale(.5);transform-origin:0 0';
+    stage.prepend(f);
+    tag.textContent = 'Prévia ao vivo · web' + imp;
+  } else if (kind === 'imagem') {
+    stage.prepend(imageEl(entry, 'stage-img'));
+    tag.textContent = 'Imagem estática · 0% de GPU' + imp;
+  } else if (kind === 'video') {
+    stage.prepend(videoEl(entry, true));
+    tag.textContent = 'Prévia ao vivo · vídeo' + imp;
+  } else {
+    const ph = document.createElement('div');
+    ph.className = 'ph thumb';
+    ph.style.cssText = 'position:absolute;inset:0;display:grid;place-items:center;border:0;border-radius:0';
+    ph.innerHTML = `<div style="text-align:center;color:var(--muted)"><div style="font-size:42px;opacity:.5">⬚</div>${entry.ext.toUpperCase()}</div>`;
+    stage.prepend(ph);
+    tag.textContent = 'Sem prévia · aplique para ver';
+  }
+}
+
+/* ---------- Galeria (Carrossel Horizontal no Bottom + Popover Único de Filtro) ---------- */
+const categories = () => ['Todos', ...new Set(catalog.map(e => e.category))];
+function closeAllDrops() {
+  document.querySelectorAll('.c-drop.open').forEach(d => d.classList.remove('open'));
+}
+document.addEventListener('click', ev => {
+  if (!ev.target.closest('.c-drop')) closeAllDrops();
+});
+if ($('#filterBtn')) {
+  $('#filterBtn').onclick = ev => {
+    ev.stopPropagation();
+    const open = $('#filterDrop').classList.contains('open');
+    closeAllDrops();
+    if (!open) $('#filterDrop').classList.add('open');
+  };
+}
+if ($('#filterClearBtn')) {
+  $('#filterClearBtn').onclick = ev => {
+    ev.stopPropagation();
+    state.category = 'Todos';
+    state.type = 'todos';
+    renderChips();
+    renderGrid();
+  };
+}
+function updateFilterIndicator() {
+  const active = state.category !== 'Todos' || state.type !== 'todos';
+  if ($('#filterBtn')) $('#filterBtn').classList.toggle('has-filter', active);
+  if ($('#filterClearBtn')) $('#filterClearBtn').hidden = !active;
+}
+
+function renderChips() {
+  const el = $('#chips');
+  if (el) {
+    el.innerHTML = '';
+    for (const c of categories()) {
+      const b = document.createElement('button');
+      b.className = 'chip' + (c === state.category ? ' active' : '');
+      const n = c === 'Todos' ? catalog.length : catalog.filter(e => e.category === c).length;
+      b.innerHTML = `${c}<em>${n}</em>`;
+      b.onclick = () => { state.category = c; renderChips(); renderGrid(); };
+      el.appendChild(b);
+    }
+  }
+  const menu = $('#catDropMenu');
+  if (menu) {
+    menu.innerHTML = '';
+    for (const c of categories()) {
+      const n = c === 'Todos' ? catalog.length : catalog.filter(e => e.category === c).length;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'fp-chip' + (c === state.category ? ' active' : '');
+      item.innerHTML = `<span>${esc(c)}</span><em>${n}</em>`;
+      item.onclick = () => {
+        state.category = c;
+        renderChips();
+        renderGrid();
+      };
+      menu.appendChild(item);
+    }
+  }
+  renderTypeChips();
+  updateFilterIndicator();
+}
+
+/* Tipo do wallpaper para o filtro: o que desenha por shader, o que é página, vídeo ou imagem (estático). */
+const TYPES = [['todos', 'Todos'], ['shader', 'Shader'], ['web', 'Web'], ['video', 'Vídeo'], ['imagem', 'Estático']];
+const typeOf = e => look(e) || 'outro';
+function renderTypeChips() {
+  const el = $('#typeChips');
+  if (el) {
+    el.innerHTML = '';
+    for (const [id, label] of TYPES) {
+      const n = id === 'todos' ? catalog.length : catalog.filter(e => typeOf(e) === id).length;
+      if (id !== 'todos' && !n) continue;
+      const b = document.createElement('button');
+      b.className = 'chip type' + (id === state.type ? ' active' : '');
+      if (id === 'imagem') b.title = 'Imagens: ficam paradas e não gastam GPU';
+      b.innerHTML = `${label}<em>${n}</em>`;
+      b.onclick = () => { state.type = id; renderTypeChips(); renderGrid(); };
+      el.appendChild(b);
+    }
+  }
+  const menu = $('#typeDropMenu');
+  if (menu) {
+    menu.innerHTML = '';
+    for (const [id, label] of TYPES) {
+      const n = id === 'todos' ? catalog.length : catalog.filter(e => typeOf(e) === id).length;
+      if (id !== 'todos' && !n) continue;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'fp-chip' + (id === state.type ? ' active' : '');
+      item.innerHTML = `<span>${esc(label)}</span><em>${n}</em>`;
+      item.onclick = () => {
+        state.type = id;
+        renderTypeChips();
+        updateFilterIndicator();
+        renderGrid();
+      };
+      menu.appendChild(item);
+    }
+  }
+}
+
+const io = new IntersectionObserver(entries => {
+  for (const it of entries) {
+    const card = it.target, e = card._entry, thumb = card.querySelector('.thumb');
+    if (it.isIntersecting) {
+      if (look(e) === 'shader' && !card._drawn) {
+        card._drawn = true;
+        drawFrame(thumb.querySelector('canvas'), e, 6);
+      } else if (look(e) === 'web' && !thumb.querySelector('iframe')) {
+        thumb.appendChild(webFrame(e, thumb.clientWidth || 168));
+      } else if (look(e) === 'video' && !thumb.querySelector('video')) {
+        thumb.prepend(videoEl(e, false));
+      } else if (look(e) === 'imagem' && !thumb.querySelector('img')) {
+        thumb.prepend(imageEl(e, 'thumb-img'));
+      }
+    } else if (look(e) === 'web') {
+      // Desmonta iframes fora da tela para não gastar GPU
+      thumb.querySelector('iframe')?.remove();
+    }
+  }
+}, { root: null, rootMargin: '240px' });
+
+function badgesFor(e) {
+  const b = [];
+  if (e.kind === 'shader') b.push('Shader');
+  else if (look(e) === 'imagem') b.push('Imagem');
+  else if (look(e) === 'video') b.push('Vídeo');
+  else if (e.kind === 'web') b.push('Web');
+  else b.push(e.ext);
+  if (e.audio) b.push('Áudio');
+  return b;
+}
+
+const isSameEntry = (a, b) => !!a && !!b && (a === b || (a.path && a.path === b.path) || (a.id && a.id === b.id));
+
+function attachShaderHover(card, e) {
+  if (look(e) !== 'shader') return;
+  let hover = 0;
+  card.onmouseenter = async () => {
+    const my = ++hover, c = card.querySelector('canvas'), t0 = performance.now();
+    while (my === hover) {
+      await whenVisible();
+      if (my !== hover) break;
+      await drawFrame(c, e, 6 + (performance.now() - t0) / 1000);
+      await new Promise(r => setTimeout(r, 60));
+    }
+  };
+  card.onmouseleave = () => { hover++; };
+}
+
+function renderGrid() {
+  const grid = $('#grid'), fullGrid = $('#fullGrid'), fgCount = $('#fgCount');
+  const prevScroll = grid.scrollLeft;
+  io.disconnect();
+  grid.innerHTML = '';
+  if (fullGrid) fullGrid.innerHTML = '';
+  const q = state.query.trim().toLowerCase();
+  const items = catalog.filter(e => (state.category === 'Todos' || e.category === state.category) &&
+    (state.type === 'todos' || typeOf(e) === state.type) &&
+    (!q || (e.title + ' ' + e.category + ' ' + e.description).toLowerCase().includes(q)));
+  if (fgCount) fgCount.textContent = `${items.length} de ${catalog.length} wallpapers`;
+  if (!items.length) {
+    const emptyHtml = '<div class="empty">Nenhum wallpaper encontrado para este filtro.</div>';
+    grid.innerHTML = emptyHtml;
+    if (fullGrid) fullGrid.innerHTML = emptyHtml;
+    return;
+  }
+  for (const e of items) {
+    const onMonitors = monitors.filter(m => isSameEntry(state.active[m.id], e)).map(m => m.id + 1);
+    const isSel = isSameEntry(state.selected, e);
+    const isAppliedOnCur = isSameEntry(state.active[state.monitor], e);
+    const pinHtml = `${e.audio ? '<i title="Reage ao áudio">♪</i>' : ''}${onMonitors.map(n => `<i class="on" title="Em execução na Tela ${n}">${n}</i>`).join('')}`;
+    const thumbMedia = look(e) === 'shader' ? '<canvas width="352" height="198"></canvas>' : look(e) ? '' : `<div class="ph">${e.ext.toUpperCase()}</div>`;
+
+    // 1. Card compacto do carrossel horizontal (no palco)
+    const card = document.createElement('button');
+    card.className = 'card' + (isSel ? ' sel' : '') + (onMonitors.length ? ' running' : '');
+    card._entry = e;
+    card.innerHTML = `<div class="thumb">${thumbMedia}
+      <div class="pin">${pinHtml}</div>
+      <span class="t-badge"><i></i>${esc(badgesFor(e)[0])}</span></div>
+      <div class="card-meta"><b>${esc(e.title)}</b><span>${esc(e.category)} · ${esc(e.description)}</span></div>`;
+    card.onclick = () => select(e);
+    attachShaderHover(card, e);
+    grid.appendChild(card);
+    io.observe(card);
+
+    // 2. Card completo da galeria em grade (abaixo do palco ao rolar)
+    if (fullGrid) {
+      const fcard = document.createElement('div');
+      fcard.className = 'fg-card' + (isSel ? ' sel' : '') + (onMonitors.length ? ' running' : '');
+      fcard._entry = e;
+      fcard.style.cursor = 'pointer';
+      fcard.innerHTML = `<div class="thumb">${thumbMedia}
+        <div class="pin">${pinHtml}</div>
+        <span class="fg-type-tag">${esc(badgesFor(e)[0])}</span></div>
+        <div class="fg-meta">
+          <div class="fg-meta-top"><b>${esc(e.title)}</b><small>${esc(e.category)}</small></div>
+          <span>${esc(e.description)}</span>
+        </div>
+        <div class="fg-foot">
+          <button type="button" class="fg-btn apply${isAppliedOnCur ? ' is-live' : ''}">${isAppliedOnCur ? '● Em exibição' : 'Aplicar'}</button>
+          <button type="button" class="fg-btn preview" title="Ver prévia gigante no palco">↑ Palco</button>
+        </div>`;
+      fcard.onclick = ev => {
+        if (ev.target.closest('.fg-btn')) return;
+        select(e);
+      };
+      fcard.querySelector('.fg-btn.apply').onclick = ev => {
+        ev.stopPropagation();
+        select(e);
+        apply(false);
+      };
+      fcard.querySelector('.fg-btn.preview').onclick = ev => {
+        ev.stopPropagation();
+        select(e, true);
+        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+      attachShaderHover(fcard, e);
+      fullGrid.appendChild(fcard);
+      io.observe(fcard);
+    }
+  }
+  grid.scrollLeft = prevScroll;
+}
+
+/* ---------- Seleção, monitores e aplicação ---------- */
+function select(e, scrollToCenter) {
+  state.selected = e;
+  $('#dCat').textContent = [e.category, ...badgesFor(e)].filter(Boolean).join(' · ');
+  $('#dTitle').textContent = e.title;
+  $('#dDesc').textContent = e.description;
+  $('#dBadges').innerHTML = badgesFor(e).map(b => `<span class="badge">${b}</span>`).join('');
+  setStage(e);
+  renderTune(e);
+  $('#removeBtn').hidden = !isRemovable(e);
+  $('#renameBtn').hidden = !isRemovable(e);
+  $('#freezeBtn').hidden = look(e) !== 'shader';
+  let selCard = null;
+  document.querySelectorAll('.card').forEach(c => {
+    const match = isSameEntry(c._entry, e);
+    c.classList.toggle('sel', match);
+    if (match) selCard = c;
+  });
+  document.querySelectorAll('.fg-card').forEach(c => {
+    c.classList.toggle('sel', isSameEntry(c._entry, e));
+  });
+  if (selCard && scrollToCenter) {
+    requestAnimationFrame(() => {
+      const grid = $('#grid');
+      if (!grid || !grid.clientWidth) return;
+      const left = selCard.offsetLeft, right = left + selCard.offsetWidth;
+      if (left < grid.scrollLeft + 4 || right > grid.scrollLeft + grid.clientWidth - 4) {
+        grid.scrollTo({ left: Math.max(0, left - (grid.clientWidth - selCard.offsetWidth) / 2), behavior: 'smooth' });
+      }
+    });
+  }
+  refreshApply();
+}
+
+/* ---------- Remover o que o usuário criou/importou (vai para a Lixeira) ---------- */
+const isRemovable = e => !!e && e.kind === 'imported';
+const usedBy = e => monitors.filter(m => isSameEntry(state.active[m.id], e)).map(m => m.id + 1);
+function removeHint(e) {
+  const u = usedBy(e);
+  return u.length ? `Está em uso no monitor ${u.join(', ')}: ele volta para o Matrix.` : 'Vai para a Lixeira do Windows; dá para restaurar de lá.';
+}
+// Dois cliques: o primeiro só pede confirmação (expira em 6 s).
+/* Texto do botão: os de ícone (`.tool`) guardam o texto num `.lbl` ao lado do ícone, vazio = só o ícone. */
+function setBtnText(btn, text) { (btn.querySelector('.lbl') || btn).textContent = text; }
+function armRemove(btn, e, idle) {
+  if (btn._armed) { clearTimeout(btn._armed); btn._armed = null; btn.classList.remove('armed'); setBtnText(btn, 'Removendo…'); btn.disabled = true; send({ action: 'remove_wallpaper', path: e.path }); return; }
+  setBtnText(btn, btn.querySelector('.lbl') ? 'Confirmar' : 'Confirmar: mover para a Lixeira'); btn.classList.add('armed'); toast(removeHint(e));
+  btn._armed = setTimeout(() => { btn._armed = null; btn.classList.remove('armed'); setBtnText(btn, idle); }, 6000);
+}
+$('#removeBtn').onclick = () => { if (isRemovable(state.selected)) armRemove($('#removeBtn'), state.selected, ''); };
+window.onWallpaperRemoved = ev => {
+  const gone = catalog.findIndex(x => x.path === ev.path);
+  const matrix = catalog.find(x => x.id === 'matrix') || null;
+  for (const id of ev.replaced || []) { if (matrix) state.active[id] = matrix; (config.monitor_wallpapers = config.monitor_wallpapers || {})[id] = ev.replacement; }
+  if (ev.ok && gone >= 0) {
+    const [removed] = catalog.splice(gone, 1);
+    if (state.selected === removed) state.selected = null;
+  }
+  $('#removeBtn').disabled = false; setBtnText($('#removeBtn'), ''); $('#removeBtn').classList.remove('armed');
+  renderChips(); renderGrid(); renderMonitors(); renderMine();
+  if (state.selected) select(state.selected); else if (catalog.length) select(catalog[0]);
+  toast(ev.ok ? 'Movido para a Lixeira.' + ((ev.replaced || []).length ? ' O monitor voltou para o Matrix.' : '') : (ev.message || 'Não consegui remover.'));
+};
+
+/* ---------- Renomear (só o título exibido; o arquivo não muda) ---------- */
+let renTarget = null;
+function openRename(e) {
+  renTarget = e;
+  $('#renInput').value = e.title;
+  $('#renModal').classList.add('open');
+  $('#renInput').focus(); $('#renInput').select();
+}
+const closeRename = () => { $('#renModal').classList.remove('open'); renTarget = null; };
+function saveRename() {
+  const e = renTarget; if (!e) return;
+  const t = $('#renInput').value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 60);
+  config.wallpaper_titles = config.wallpaper_titles || {};
+  if (t) config.wallpaper_titles[e.path] = t; else delete config.wallpaper_titles[e.path];
+  e.title = t || stem(e.path);
+  send({ action: 'set_wallpaper_title', path: e.path, title: t });
+  closeRename();
+  renderChips(); renderGrid(); renderMonitors(); renderMine(); refreshApply();
+  if (state.selected === e) select(e);
+  toast(t ? 'Renomeado' : 'Voltou ao nome do arquivo');
+}
+$('#renCancel').onclick = closeRename;
+$('#renOk').onclick = saveRename;
+$('#renInput').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); saveRename(); } });
+$('#renameBtn').onclick = () => { if (state.selected) openRename(state.selected); };
+
+/* ---------- Aba Criar ---------- */
+const kindName = e => ({ shader: 'Shader', web: 'Página web', video: 'Vídeo', imagem: 'Imagem', livewallpaper: 'Pacote', pasta: 'Página web' })[e.ext] || 'Wallpaper';
+function renderMine() {
+  const box = $('#mine'); box.textContent = '';
+  const mine = catalog.filter(x => x.kind === 'imported').sort((a, b) => a.title.localeCompare(b.title));
+  if (!mine.length) {
+    const row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = '<div><div class="t">Nada por aqui ainda</div><div class="d">O que você criar com a IA, no Lab ou importar aparece nesta lista.</div></div>';
+    box.appendChild(row); return;
+  }
+  for (const e of mine) {
+    const row = document.createElement('div'); row.className = 'row';
+    const left = document.createElement('div');
+    const t = document.createElement('div'); t.className = 't'; t.textContent = e.title;
+    const d = document.createElement('div'); d.className = 'd';
+    const u = usedBy(e);
+    d.textContent = kindName(e) + (u.length ? ` · em uso no monitor ${u.join(', ')}` : '');
+    left.append(t, d);
+    const act = document.createElement('div'); act.className = 'mine-actions';
+    const ap = document.createElement('button'); ap.className = 'btn'; ap.textContent = `Aplicar no monitor ${state.monitor + 1}`;
+    ap.onclick = () => { send({ action: 'set_wallpaper', monitor: state.monitor, path: e.path }); state.active[state.monitor] = e; renderMonitors(); renderGrid(); refreshApply(); renderMine(); };
+    act.appendChild(ap);
+    if (e.ext === 'shader' && /\.hlsl$/i.test(e.path)) {
+      const lab = document.createElement('button'); lab.className = 'btn'; lab.textContent = 'Ajustar no Lab';
+      lab.onclick = async () => {
+        try { const rr = await fetch('/lab/open?path=' + encodeURIComponent(e.path)); if (!rr.ok) throw new Error(await rr.text()); openInLab(e.title, await rr.text()); }
+        catch (err) { toast('Não consegui abrir no Lab: ' + err.message); }
+      };
+      act.appendChild(lab);
+    }
+    if (isRemovable(e)) {
+      const rn = document.createElement('button'); rn.className = 'btn'; rn.textContent = 'Renomear';
+      rn.setAttribute('aria-label', 'Renomear ' + e.title); rn.onclick = () => openRename(e); act.appendChild(rn);
+      const rm = document.createElement('button'); rm.className = 'btn danger'; rm.textContent = 'Remover…';
+      rm.setAttribute('aria-label', 'Remover ' + e.title);
+      rm.onclick = () => armRemove(rm, e, 'Remover…'); act.appendChild(rm);
+    }
+    row.append(left, act); box.appendChild(row);
+  }
+}
+/* Rascunhos da IA: o que ela gerou e não foi salvo. O motor lê a pasta e devolve a lista (`drafts`). */
+const fmtWhen = stamp => new Date(stamp * 1000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const fmtSize = n => n >= 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
+function renderDrafts(list) {
+  $('#draftsWrap').hidden = !list.length;
+  const box = $('#drafts'); box.textContent = '';
+  for (const d of list) {
+    const row = document.createElement('div'); row.className = 'row draft-row';
+    const left = document.createElement('div');
+    const t = document.createElement('div'); t.className = 't';
+    t.textContent = d.kind === 'web' ? 'Página web' : (d.ext === 'glsl' ? 'Shader (GLSL)' : 'Shader (HLSL)');
+    const small = document.createElement('small'); small.textContent = fmtWhen(d.stamp) + ' · ' + fmtSize(d.size); t.appendChild(small);
+    const dd = document.createElement('div'); dd.className = 'd'; dd.textContent = d.name;
+    left.append(t, dd);
+    const act = document.createElement('div'); act.className = 'mine-actions';
+    const imp = document.createElement('button'); imp.className = 'btn primary';
+    imp.textContent = `Importar no monitor ${state.monitor + 1}`;
+    imp.title = d.kind === 'web' ? 'Copia para os seus wallpapers e aplica (pede confirmação: é uma página com código)' : 'Copia para os seus wallpapers e aplica';
+    imp.onclick = () => send({ action: 'import_file', path: d.path, monitor: state.monitor });
+    act.appendChild(imp);
+    if (d.ext === 'hlsl') {
+      const lab = document.createElement('button'); lab.className = 'btn'; lab.textContent = 'Abrir no Lab';
+      lab.onclick = async () => {
+        try { const rr = await fetch('/lab/open?path=' + encodeURIComponent(d.path)); if (!rr.ok) throw new Error(await rr.text()); openInLab('rascunho_ia', await rr.text()); }
+        catch (err) { toast('Não consegui abrir no Lab: ' + err.message); }
+      };
+      act.appendChild(lab);
+    }
+    const rm = document.createElement('button'); rm.className = 'btn danger'; rm.textContent = 'Apagar';
+    rm.setAttribute('aria-label', 'Apagar o rascunho de ' + fmtWhen(d.stamp));
+    rm.onclick = () => send({ action: 'ai_draft_remove', name: d.name });
+    act.appendChild(rm);
+    row.append(left, act); box.appendChild(row);
+  }
+}
+const loadDrafts = () => send({ action: 'ai_drafts' });
+async function renderTemplates() {
+  const box = $('#tplGrid');
+  try {
+    const list = (await (await fetch('/lab/list')).json()).filter(x => x.group === 'Modelos');
+    box.textContent = '';
+    for (const t of list) {
+      const b = document.createElement('button'); b.className = 'create-card';
+      b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 14l5-4 4 3 3-2 4 3"/></svg><b></b><span></span>';
+      b.querySelector('b').textContent = t.title.replace(/^Modelo · /, ''); b.querySelector('span').textContent = t.description || '';
+      b.onclick = async () => { try { const r2 = await fetch('/lab/source/' + encodeURIComponent(t.id)); openInLab(t.id.replace(/^tpl:/, ''), await r2.text()); } catch { toast('Não consegui abrir o modelo.'); } };
+      box.appendChild(b);
+    }
+    if (!list.length) box.textContent = '';
+  } catch { box.textContent = ''; }
+}
+$('#ccAi').onclick = () => showView('ai');
+$('#aiBack').onclick = () => showView('create');
+$('#ccLab').onclick = () => showView('lab');
+renderMine(); renderTemplates();
+
+/* ---------- Ajustes › Dados: tamanhos e limpeza ---------- */
+const DATA_LABEL = {
+  shader_cache: ['Cache de shaders', 'Refeito sozinho na próxima vez que um shader carregar.'],
+  package_cache: ['Cache de pacotes (.livewallpaper)', 'Extrações refeitas ao carregar o pacote de novo.'],
+  ai_drafts: ['Rascunhos da IA', 'Códigos que não chegaram a ser salvos.'],
+  config_backups: ['Cópias da configuração', 'config.toml.bak-… e .invalid; vão para a Lixeira.'],
+};
+const fmtBytes = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
+window.onDataUsage = rows => {
+  const box = $('#dataRows'); box.textContent = '';
+  for (const r of rows) {
+    const [name, hint] = DATA_LABEL[r.what] || [r.what, ''];
+    const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px';
+    const l = document.createElement('div'); l.innerHTML = '<div style="font-size:13px"></div><div class="d" style="margin:0"></div>';
+    l.firstChild.textContent = `${name} · ${r.files} ${r.files === 1 ? 'item' : 'itens'} · ${fmtBytes(r.bytes)}`; l.lastChild.textContent = hint;
+    const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Limpar'; b.disabled = r.files === 0;
+    b.setAttribute('aria-label', 'Limpar ' + name);
+    b.onclick = () => { b.disabled = true; send({ action: 'clean_data', what: r.what }); };
+    row.append(l, b); box.appendChild(row);
+  }
+};
+window.onDataCleaned = ev => toast(ev.files ? `Limpo: ${ev.files} ${ev.files === 1 ? 'item' : 'itens'}, ${fmtBytes(ev.bytes)} liberados.` : 'Nada para limpar.');
+
+function renderMonitors() {
+  const box = $('#monitors');
+  box.innerHTML = '';
+  if (!monitors.length) { box.innerHTML = '<div class="empty" style="padding:38px 0">Nenhum monitor detectado</div>'; return; }
+  const minX = Math.min(...monitors.map(m => m.x ?? 0)), minY = Math.min(...monitors.map(m => m.y ?? 0));
+  const maxX = Math.max(...monitors.map(m => (m.x ?? 0) + m.width)), maxY = Math.max(...monitors.map(m => (m.y ?? 0) + m.height));
+  const W = (box.clientWidth || 272) - 20, H = (box.clientHeight || 104) - 20;
+  const k = Math.min(W / (maxX - minX), H / (maxY - minY));
+  const ox = (W - (maxX - minX) * k) / 2 + 10, oy = (H - (maxY - minY) * k) / 2 + 10;
+  for (const m of monitors) {
+    const el = document.createElement('div');
+    el.className = 'mon' + (m.id === state.monitor ? ' sel' : '');
+    el.style.left = (ox + ((m.x ?? 0) - minX) * k + 2) + 'px';
+    el.style.top = (oy + ((m.y ?? 0) - minY) * k + 2) + 'px';
+    el.style.width = (m.width * k - 4) + 'px';
+    el.style.height = (m.height * k - 4) + 'px';
+    const cur = state.active[m.id];
+    el.innerHTML = `<b>${m.id + 1}</b><span>${cur ? esc(cur.title) : '—'}</span>`;
+    el.title = `Monitor ${m.id + 1} · ${m.width}×${m.height}${cur ? ' · ' + cur.title : ''}`;
+    // Monitores pequenos no mapa mostram só o número (o nome fica no tooltip).
+    el.classList.toggle('small', m.height * k < 56 || m.width * k < 90);
+    el.onclick = () => {
+      state.monitor = m.id;
+      send({ action: 'select_monitor', monitor: m.id });
+      renderMonitors();
+      if (state.active[m.id]) select(state.active[m.id], true);
+    };
+    box.appendChild(el);
+  }
+  const sel = monitors.find(m => m.id === state.monitor);
+  $('#monHint').textContent = sel ? `${sel.width}×${sel.height}` : '';
+  // O que está em cada monitor (clique seleciona o monitor)
+  const list = $('#inUse');
+  list.innerHTML = '';
+  for (const m of [...monitors].sort((a, b) => a.id - b.id)) {
+    const cur = state.active[m.id];
+    const row = document.createElement('button');
+    row.className = 'use-row' + (m.id === state.monitor ? ' sel' : '');
+    row.innerHTML = `<i>${m.id + 1}</i><div><b>${cur ? esc(cur.title) : 'Nada aplicado'}</b><small>${m.width}×${m.height}${cur ? ' · ' + badgesFor(cur)[0] : ''}</small></div>`;
+    row.onclick = () => {
+      state.monitor = m.id;
+      send({ action: 'select_monitor', monitor: m.id });
+      renderMonitors();
+      if (cur) select(cur, true); else refreshApply();
+    };
+    list.appendChild(row);
+  }
+}
+
+function refreshApply() {
+  const btn = $('#applyBtn');
+  if (!btn) return;
+  const applied = state.selected && isSameEntry(state.active[state.monitor], state.selected);
+  btn.hidden = false;
+  btn.classList.toggle('is-live', !!applied);
+  if (applied) {
+    btn.innerHTML = `<i class="cta-live-dot"></i><span>Em exibição</span>`;
+  } else {
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor"/></svg><span>Aplicar</span>`;
+  }
+  const stTxt = $('#heroMonStatusTxt');
+  if (stTxt) {
+    const mon = monitors.find(m => m.id === state.monitor);
+    const cur = state.active[state.monitor];
+    const res = mon ? ` (${mon.width}×${mon.height})` : '';
+    stTxt.textContent = `Tela ${state.monitor + 1}${res} · ${cur ? 'No ar: ' + cur.title : 'Sem wallpaper'}`;
+  }
+}
+
+function apply(all) {
+  const e = state.selected;
+  if (!e) return;
+  if (all) {
+    send({ action: 'sync_all', path: e.path });
+    monitors.forEach(m => state.active[m.id] = e);
+  } else {
+    send({ action: 'set_wallpaper', monitor: state.monitor, path: e.path });
+    state.active[state.monitor] = e;
+  }
+  // O aviso de sucesso vem do motor (onApplied); se ele não conseguir carregar, onApplyError desfaz a seleção.
+  renderMonitors(); renderGrid(); refreshApply();
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ---------- Ajustes ---------- */
+function initSettings() {
+  const fps = config.target_fps || 30;
+  document.querySelectorAll('#fpsSeg button').forEach(b => {
+    b.classList.toggle('active', +b.dataset.v === fps);
+    b.onclick = () => {
+      document.querySelectorAll('#fpsSeg button').forEach(x => x.classList.toggle('active', x === b));
+      config.target_fps = +b.dataset.v;
+      renderStatus();
+      send({ action: 'set_fps', value: +b.dataset.v });
+    };
+  });
+  const speed = $('#speed');
+  speed.value = config.speed || 1;
+  $('#speedVal').textContent = (+speed.value).toFixed(2) + '×';
+  speed.oninput = () => { $('#speedVal').textContent = (+speed.value).toFixed(2) + '×'; };
+  speed.onchange = () => { config.speed = +speed.value; send({ action: 'set_speed', value: +speed.value }); };
+
+  const sw = $('#swatches');
+  const cur = (config.tint || 'auto').toUpperCase();
+  for (const a of ACCENTS) {
+    const b = document.createElement('button');
+    b.className = 'sw' + (a === 'auto' ? ' auto' : '') + ((a.toUpperCase() === cur || (a === 'auto' && !/^#/.test(cur))) ? ' active' : '');
+    if (a !== 'auto') b.style.background = a;
+    b.title = a === 'auto' ? 'Automático: cada wallpaper usa as próprias cores' : a;
+    b.onclick = () => {
+      sw.querySelectorAll('.sw').forEach(x => x.classList.toggle('active', x === b));
+      config.tint = a;
+      updateTintQuery();
+      send({ action: 'set_tint', value: a });
+      document.querySelectorAll('.card').forEach(c => c._drawn = false);
+      renderGrid();
+    };
+    sw.appendChild(b);
+  }
+  // Seletor livre: a bolinha tracejada com "+" abre uma roda de cores (matiz pelo ângulo, saturação pelo raio) e um brilho.
+  const custom = document.createElement('button');
+  const isCustom = /^#[0-9a-f]{6}$/i.test(cur) && !ACCENTS.some(a => a.toUpperCase() === cur);
+  custom.className = 'sw custom' + (isCustom ? ' active' : '');
+  custom.title = 'Outra cor…';
+  custom.textContent = '+';
+  const hex2hsv = hx => { const n = parseInt(hx.slice(1), 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+    if (d) h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [h * 60, mx ? d / mx : 0, mx]; };
+  const hsv2hex = (h, sa, v) => { const f = n => { const k = (n + h / 60) % 6; return v - v * sa * Math.max(0, Math.min(k, 4 - k, 1)); };
+    return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('').toUpperCase(); };
+  let hsv = hex2hsv(isCustom ? cur : '#9D4EDD');
+  const cp = document.createElement('div');
+  cp.className = 'cp';
+  cp.innerHTML = '<div class="wheel"><canvas width="336" height="336"></canvas><div class="dim"></div><div class="knob"></div></div><div class="bri"><div class="knob"></div></div><div class="hexrow"><div class="prev"></div><input class="hex" maxlength="7" spellcheck="false" aria-label="Cor de destaque em hexadecimal"></div>';
+  document.body.appendChild(cp);                       // fora dos cartões de ajustes, que cortam o que passa da borda
+  const wheel = cp.querySelector('.wheel'), briEl = cp.querySelector('.bri'), hexEl = cp.querySelector('.hex'), prev = cp.querySelector('.prev'), dim = cp.querySelector('.dim');
+  (() => {                                             // roda de cores: desenhada uma vez
+    const cv = wheel.querySelector('canvas'), g2 = cv.getContext('2d'), N = cv.width, R = N / 2, img = g2.createImageData(N, N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const dx = x + .5 - R, dy = y + .5 - R, rr = Math.hypot(dx, dy) / R, i = (y * N + x) * 4;
+      if (rr > 1) continue;
+      const hx = hsv2hex((Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360, Math.min(1, rr), 1), n = parseInt(hx.slice(1), 16);
+      img.data[i] = n >> 16 & 255; img.data[i + 1] = n >> 8 & 255; img.data[i + 2] = n & 255; img.data[i + 3] = rr > .985 ? Math.round((1 - rr) / .015 * 255) : 255;
+    }
+    g2.putImageData(img, 0, 0);
+  })();
+  let sendTimer = 0;
+  const paint = () => {
+    const hx = hsv2hex(...hsv), ang = hsv[0] * Math.PI / 180, kn = wheel.querySelector('.knob');
+    kn.style.left = 50 + Math.cos(ang) * hsv[1] * 50 + '%'; kn.style.top = 50 + Math.sin(ang) * hsv[1] * 50 + '%';
+    dim.style.opacity = 1 - hsv[2];
+    briEl.style.setProperty('--bc', hsv2hex(hsv[0], hsv[1], 1));
+    briEl.firstChild.style.left = hsv[2] * 100 + '%';
+    prev.style.background = hx; custom.style.setProperty('--cc', hx);
+    if (document.activeElement !== hexEl) hexEl.value = hx;
+    return hx;
+  };
+  const push = commit => {
+    const hx = paint();
+    sw.querySelectorAll('.sw').forEach(x => x.classList.toggle('active', x === custom));
+    config.tint = hx;
+    clearTimeout(sendTimer);
+    sendTimer = setTimeout(() => send({ action: 'set_tint', value: hx }), commit ? 0 : 120);
+    if (commit) { updateTintQuery(); document.querySelectorAll('.card').forEach(c => c._drawn = false); renderGrid(); }
+  };
+  const drag = (el, fn) => {
+    el.addEventListener('pointerdown', e => {
+      el.setPointerCapture(e.pointerId);
+      const move = ev => { const r = el.getBoundingClientRect(); fn(ev.clientX - r.left - r.width / 2, ev.clientY - r.top - r.height / 2, r); push(false); };
+      move(e);
+      const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); push(true); };
+      el.addEventListener('pointermove', move); el.addEventListener('pointerup', up);
+    });
+  };
+  drag(wheel, (dx, dy, r) => { hsv[0] = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360; hsv[1] = Math.min(1, Math.hypot(dx, dy) / (r.width / 2)); });
+  drag(briEl, (dx, dy, r) => { hsv[2] = Math.min(1, Math.max(0, (dx + r.width / 2) / r.width)); });
+  hexEl.oninput = () => { let v = hexEl.value.trim(); if (!v.startsWith('#')) v = '#' + v; if (/^#[0-9a-f]{6}$/i.test(v)) { hsv = hex2hsv(v); push(true); } };
+  hexEl.onblur = () => { hexEl.value = hsv2hex(...hsv); };
+  const place = () => {                                 // acima da bolinha se couber; senão abaixo; sempre dentro da janela
+    const a = custom.getBoundingClientRect(), w = cp.offsetWidth, h = cp.offsetHeight;
+    let top = a.top - h - 12; if (top < 8) top = Math.min(a.bottom + 12, innerHeight - h - 8);
+    cp.style.top = Math.max(8, top) + 'px';
+    cp.style.left = Math.max(8, Math.min(a.right - w, innerWidth - w - 8)) + 'px';
+  };
+  const closeCp = () => cp.classList.remove('open');
+  custom.onclick = e => { e.stopPropagation(); cp.classList.toggle('open'); if (cp.classList.contains('open')) { paint(); place(); } };
+  document.addEventListener('pointerdown', e => { if (!cp.contains(e.target) && !custom.contains(e.target)) closeCp(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCp(); });
+  addEventListener('resize', closeCp);
+  document.addEventListener('scroll', closeCp, true);
+  paint();
+  sw.appendChild(custom);
+
+  const perfSet = m => document.querySelectorAll('#perfSeg button').forEach(b => b.classList.toggle('active', b.dataset.v === m));
+  perfSet(config.performance_mode || 'auto');
+  document.querySelectorAll('#perfSeg button').forEach(b => b.onclick = () => {
+    config.performance_mode = b.dataset.v; perfSet(b.dataset.v);
+    send({ action: 'set_performance_mode', value: b.dataset.v });
+  });
+  /* O motor avisa quando o modo entra/sai (jogo em tela cheia, bandeja ou Ajustes). */
+  window.onPerformance = (active, mode) => { state.perfActive = active; config.performance_mode = mode; perfSet(mode); renderStatus(); };
+
+  const toggles = [
+    ['#parallax', 'parallax_enabled', 'set_parallax_enabled'],
+    ['#mouse', 'mouse_enabled', 'set_mouse_enabled'],
+    ['#covered', 'pause_when_covered', 'set_pause_covered'],
+    ['#battery', 'pause_on_battery', 'set_pause_battery'],
+    ['#autostart', 'autostart', 'set_autostart'],
+    ['#showConsole', 'show_console', 'set_show_console'],
+    ['#lockscreen', 'mirror_lock_screen', 'set_lock_screen'],
+  ];
+  for (const [sel, key, action] of toggles) {
+    const el = $(sel);
+    el.checked = !!config[key];
+    el.onchange = () => { config[key] = el.checked; send({ action, value: el.checked }); };
+  }
+  $('#folderBtn').onclick = () => send({ action: 'open_config_folder' });
+  let resetArmed = null;
+  $('#resetBtn').onclick = () => {
+    const b = $('#resetBtn');
+    if (!resetArmed) {                      // 1º clique só pede confirmação
+      b.textContent = 'Confirmar: restaurar agora';
+      resetArmed = setTimeout(() => { resetArmed = null; b.textContent = 'Restaurar padrões'; }, 6000);
+      return;
+    }
+    clearTimeout(resetArmed); resetArmed = null;
+    b.textContent = 'Restaurando…';
+    send({ action: 'reset_config' });
+  };
+  initScreensaver();
+  initPlaylist();
+  initSchedule();
+}
+
+let refreshDynamicSettings = () => {};
+
+function initScreensaver() {
+  const ss = config.screensaver = Object.assign(
+    { enabled: false, idle_minutes: 5, wallpaper: '', lock_on_dismiss: false }, config.screensaver || {});
+  const save = () => send({ action: 'set_screensaver', value: ss });
+  const en = $('#ssEnabled');
+  en.checked = !!ss.enabled;
+  en.onchange = () => { ss.enabled = en.checked; save(); };
+  const lk = $('#ssLock');
+  lk.checked = !!ss.lock_on_dismiss;
+  lk.onchange = () => { ss.lock_on_dismiss = lk.checked; save(); };
+  $('#ssTest').onclick = () => send({ action: 'start_screensaver' });
+  const buttons = [...document.querySelectorAll('#ssIdle button')];
+  const best = buttons.reduce((a, b) => Math.abs(+b.dataset.v - ss.idle_minutes) < Math.abs(+a.dataset.v - ss.idle_minutes) ? b : a);
+  buttons.forEach(b => {
+    b.classList.toggle('active', b === best);
+    b.onclick = () => { ss.idle_minutes = +b.dataset.v; buttons.forEach(x => x.classList.toggle('active', x === b)); save(); };
+  });
+  const sel = $('#ssWallpaper');
+  window._rebuildSsSelect = () => {
+    sel.innerHTML = '';
+    const opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = 'Mesmo wallpaper de cada monitor';
+    sel.appendChild(opt0);
+    for (const e of catalog) {
+      if (e.kind === 'web') continue;
+      const o = document.createElement('option');
+      o.value = e.path || e.id;
+      o.textContent = (e.title || e.id) + (e.kind === 'imported' ? ` (${e.ext || 'importado'})` : '');
+      sel.appendChild(o);
+    }
+    sel.value = ss.wallpaper || '';
+  };
+  window._rebuildSsSelect();
+  sel.onchange = () => { ss.wallpaper = sel.value; save(); };
+}
+
+function initPlaylist() {
+  const pl = config.playlist = Object.assign(
+    { enabled: false, interval_minutes: 10, shuffle: false, transition_ms: 1000, items: [], monitor_items: {} }, config.playlist || {});
+  pl.monitor_items = pl.monitor_items || {};
+  let scope = 'global'; // 'global' ou índice do monitor como string ('0', '1', ...)
+  const save = () => send({ action: 'set_playlist', value: pl });
+  const seg = (sel, key) => {
+    const buttons = [...document.querySelectorAll(sel + ' button')];
+    const best = buttons.reduce((a, b) => Math.abs(+b.dataset.v - pl[key]) < Math.abs(+a.dataset.v - pl[key]) ? b : a);
+    buttons.forEach(b => {
+      b.classList.toggle('active', b === best);
+      b.onclick = () => { pl[key] = +b.dataset.v; buttons.forEach(x => x.classList.toggle('active', x === b)); save(); };
+    });
+  };
+  seg('#plInterval', 'interval_minutes');
+  seg('#plFade', 'transition_ms');
+  for (const [sel, key] of [['#plEnabled', 'enabled'], ['#plShuffle', 'shuffle']]) {
+    const el = $(sel);
+    el.checked = !!pl[key];
+    el.onchange = () => { pl[key] = el.checked; save(); };
+  }
+
+  const currentList = () => scope === 'global' ? pl.items : (pl.monitor_items[scope] || []);
+  const setCurrentList = next => {
+    if (scope === 'global') pl.items = next;
+    else if (next.length) pl.monitor_items[scope] = next;
+    else delete pl.monitor_items[scope];
+  };
+
+  const scopeBox = $('#plScope');
+  const itemsBox = $('#plItems');
+  const count = () => {
+    const list = currentList();
+    if (scope === 'global') {
+      $('#plCount').textContent = list.length ? `${list.length} marcados` : 'Todos os shaders';
+    } else {
+      $('#plCount').textContent = list.length ? `${list.length} na Tela ${+scope + 1}` : `Usando fila global`;
+    }
+  };
+
+  window._rebuildPlScope = () => {
+    if (scope !== 'global' && !monitors.some(m => String(m.id) === scope)) scope = 'global';
+    scopeBox.innerHTML = '';
+    const mkBtn = (val, label) => {
+      const b = document.createElement('button');
+      b.dataset.v = val;
+      b.textContent = label;
+      b.classList.toggle('active', scope === val);
+      b.onclick = () => {
+        scope = val;
+        [...scopeBox.querySelectorAll('button')].forEach(x => x.classList.toggle('active', x === b));
+        window._rebuildPlItems();
+      };
+      scopeBox.appendChild(b);
+    };
+    mkBtn('global', 'Global');
+    for (const m of monitors) {
+      const hasCustom = (pl.monitor_items[m.id] || []).length > 0;
+      mkBtn(String(m.id), `Tela ${m.id + 1}${hasCustom ? ' •' : ''}`);
+    }
+  };
+
+  window._rebuildPlItems = () => {
+    itemsBox.innerHTML = '';
+    const list = currentList();
+    for (const e of catalog) {
+      const spec = e.path || e.id;
+      const b = document.createElement('button');
+      b.className = 'chip' + (list.includes(spec) ? ' active' : '');
+      b.textContent = e.title || e.id;
+      b.title = e.kind === 'web' ? 'Wallpaper web (troca sem fade)' : (e.category || '');
+      b.onclick = () => {
+        const cur = currentList();
+        const on = !cur.includes(spec);
+        setCurrentList(on ? [...cur, spec] : cur.filter(x => x !== spec));
+        b.classList.toggle('active', on);
+        count();
+        window._rebuildPlScope();
+        save();
+      };
+      itemsBox.appendChild(b);
+    }
+    count();
+  };
+
+  window._rebuildPlScope();
+  window._rebuildPlItems();
+}
+
+function initSchedule() {
+  const sch = config.schedule = Object.assign({ enabled: false, slots: [] }, config.schedule || {});
+  sch.slots = Array.isArray(sch.slots) ? sch.slots : [];
+  const save = () => send({ action: 'set_schedule', value: sch });
+  const en = $('#schEnabled');
+  en.checked = !!sch.enabled;
+  en.onchange = () => { sch.enabled = en.checked; save(); };
+
+  const slotsBox = $('#schSlots');
+  window._rebuildSchSlots = () => {
+    slotsBox.innerHTML = '';
+    if (!sch.slots.length) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11.5px;color:var(--faint);padding:2px 0';
+      empty.textContent = 'Nenhum horário configurado.';
+      slotsBox.appendChild(empty);
+      return;
+    }
+    sch.slots.forEach((slot, idx) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:80px 1fr auto;gap:5px;align-items:center;padding:7px;border-radius:9px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.05)';
+
+      const timeIn = document.createElement('input');
+      timeIn.type = 'time';
+      timeIn.className = 'search';
+      timeIn.style.cssText = 'width:100%;padding:5px 6px;font-size:11.5px';
+      timeIn.value = slot.start || '08:00';
+      timeIn.onchange = () => { slot.start = timeIn.value || '08:00'; save(); };
+
+      const wpSel = document.createElement('select');
+      wpSel.className = 'search';
+      wpSel.style.cssText = 'width:100%;padding:5px 6px;font-size:11.5px';
+      for (const e of catalog) {
+        const o = document.createElement('option');
+        o.value = e.path || e.id;
+        o.textContent = (e.title || e.id) + (e.kind === 'imported' ? ` (${e.ext || 'importado'})` : '');
+        wpSel.appendChild(o);
+      }
+      wpSel.value = slot.wallpaper || (catalog[0]?.path || 'aurora');
+      wpSel.onchange = () => { slot.wallpaper = wpSel.value; save(); };
+
+      const monSel = document.createElement('select');
+      monSel.className = 'search';
+      monSel.style.cssText = 'grid-column:1 / 3;width:100%;padding:5px 6px;font-size:11.5px';
+      const allOpt = document.createElement('option');
+      allOpt.value = '';
+      allOpt.textContent = 'Todas as telas';
+      monSel.appendChild(allOpt);
+      for (const m of monitors) {
+        const mo = document.createElement('option');
+        mo.value = String(m.id);
+        mo.textContent = `Tela ${m.id + 1}`;
+        monSel.appendChild(mo);
+      }
+      monSel.value = (slot.monitor === null || slot.monitor === undefined) ? '' : String(slot.monitor);
+      monSel.onchange = () => {
+        slot.monitor = monSel.value === '' ? null : +monSel.value;
+        save();
+      };
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn';
+      delBtn.style.cssText = 'padding:5px 8px;font-size:11px';
+      delBtn.title = 'Remover horário';
+      delBtn.textContent = '✕';
+      delBtn.onclick = () => {
+        sch.slots.splice(idx, 1);
+        window._rebuildSchSlots();
+        save();
+      };
+
+      row.append(timeIn, wpSel, delBtn, monSel);
+      slotsBox.appendChild(row);
+    });
+  };
+
+  $('#schAdd').onclick = () => {
+    sch.slots.push({ start: '18:00', wallpaper: 'rain_glass', monitor: null });
+    window._rebuildSchSlots();
+    save();
+  };
+  $('#schPreset').onclick = () => {
+    sch.enabled = true;
+    en.checked = true;
+    sch.slots = [
+      { start: '07:00', wallpaper: 'ocean', monitor: null },
+      { start: '13:00', wallpaper: 'coding', monitor: null },
+      { start: '18:30', wallpaper: 'rain_glass', monitor: null },
+      { start: '22:30', wallpaper: 'night_sky', monitor: null },
+    ];
+    window._rebuildSchSlots();
+    save();
+  };
+
+  window._rebuildSchSlots();
+}
+
+refreshDynamicSettings = () => {
+  window._rebuildSsSelect && window._rebuildSsSelect();
+  window._rebuildPlScope && window._rebuildPlScope();
+  window._rebuildPlItems && window._rebuildPlItems();
+  window._rebuildSchSlots && window._rebuildSchSlots();
+};
+
+/* ---------- Ganchos chamados pelo motor ---------- */
+window.updateMonitorsList = list => {
+  monitors = list;
+  if (!monitors.some(m => m.id === state.monitor)) state.monitor = monitors[0]?.id ?? 0;
+  renderMonitors(); renderStatus(); refreshDynamicSettings();
+};
+/* O motor confirma ou recusa cada troca; só então o Studio anuncia o resultado. */
+const titleOf = path => { const e = catalog.find(x => x.path === path || x.id === path); return e ? e.title : stem(path); };
+window.onApplied = (monitor, path) => {
+  toast(monitor === null ? `${titleOf(path)} aplicado em todos os monitores` : `${titleOf(path)} aplicado no monitor ${monitor + 1}`);
+};
+window.onApplyError = ({ monitors: failed, path, message, current }) => {
+  // Desfaz a seleção otimista: o que continua no ar é o que o motor diz estar em `current`.
+  for (const id of failed) {
+    const spec = (current || {})[id];
+    const prev = spec ? entryFor(spec) : null;
+    if (prev) state.active[id] = prev; else delete state.active[id];
+    (config.monitor_wallpapers = config.monitor_wallpapers || {})[id] = spec;
+  }
+  renderMonitors(); renderGrid(); refreshApply();
+  toast(`Não consegui carregar ${titleOf(path)}. O wallpaper anterior continua. ${message || ''}`.trim());
+};
+window.onConfigReset = backup => {
+  $('#resetBtn').textContent = 'Restaurar padrões';
+  toast(backup ? 'Configuração restaurada. Feche e abra o Studio para ver os valores. Cópia salva em ' + backup : 'Não consegui guardar a cópia do config.toml; nada foi alterado.');
+};
+window.onWallpaperImported = (monitor, title, path) => {
+  stModal.classList.remove('open'); $('#stCode').value = ''; $('#stTitle').value = '';
+  const e = addImported(path, title);
+  state.active[monitor] = e;
+  renderChips(); renderGrid(); renderMonitors(); select(e); refreshDynamicSettings();
+  toast(`${title} importado e aplicado`);
+};
+
+/* ---------- Eventos ---------- */
+/* Telas sem botão próprio na barra lateral ficam dentro de outra (a IA vive em Criar). */
+const NAV_OF = { ai: 'create' };
+function switchDockTab(tab) {
+  document.querySelectorAll('.dock-tabs button').forEach(x => x.classList.toggle('active', x.dataset.dtab === tab));
+  document.querySelectorAll('.dock-pane').forEach(p => p.classList.toggle('active', p.id === 'dpane-' + tab));
+  if (tab === 'monitors') setTimeout(renderMonitors, 40);
+}
+function setDockOpen(open) {
+  document.body.classList.toggle('dock-closed', !open);
+  setTimeout(renderMonitors, 240);
+}
+function showView(name) {
+  if (name === 'settings') {
+    setDockOpen(true);
+    switchDockTab('settings');
+    return;
+  }
+  const nav = NAV_OF[name] || name;
+  document.querySelectorAll('.nav[data-view]').forEach(x => x.classList.toggle('active', x.dataset.view === nav));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+  if (name === 'create') loadDrafts();
+  if (name === 'ai') aiMaybeWizard();
+  const isLab = name === 'lab';
+  document.querySelector('main').classList.toggle('lab-on', isLab);
+  if ($('#rightDock')) $('#rightDock').hidden = isLab;
+  if ($('#dockOpenBtn')) $('#dockOpenBtn').hidden = isLab;
+  const lab = $('#view-lab');
+  if (isLab && !lab.firstChild) { const f = document.createElement('iframe'); f.src = '/lab'; lab.appendChild(f); }
+}
+document.querySelectorAll('.nav[data-view]').forEach(b => b.onclick = () => showView(b.dataset.view));
+// O Lab (iframe) pede para aplicar um shader salvo no monitor selecionado.
+addEventListener('message', e => {
+  // Só o iframe do Lab fala com o Studio: uma prévia de wallpaper importado (sandbox) também pode chamar
+  // parent.postMessage e não pode escolher o que vai para o desktop.
+  const labFrame = document.querySelector('#view-lab iframe');
+  if (!labFrame || e.source !== labFrame.contentWindow) return;
+  const d = e.data;
+  if (d && d.lab === 'params' && typeof d.path === 'string' && d.values) {
+    // Valores do Lab para um shader salvo: o desktop usa os mesmos da prévia.
+    for (const [name, value] of Object.entries(d.values)) {
+      if (Number.isFinite(value)) { (config.shader_params[d.path] = config.shader_params[d.path] || {})[name] = value; send({ action: 'set_shader_param', spec: d.path, name, value }); }
+    }
+  }
+  if (d && d.lab === 'apply' && typeof d.path === 'string') {
+    for (const [name, value] of Object.entries(d.values || {})) {
+      if (Number.isFinite(value)) { (config.shader_params[d.path] = config.shader_params[d.path] || {})[name] = value; send({ action: 'set_shader_param', spec: d.path, name, value }); }
+    }
+    send({ action: 'set_wallpaper', monitor: state.monitor, path: d.path });
+  }
+});
+/* Importar página/pacote: roda código, então o motor pede confirmação antes de copiar e aplicar. */
+const impModal = $('#impModal');
+let impPending = null;
+window.onImportConfirm = (path, name, monitor) => {
+  impPending = { path, monitor };
+  $('#impName').textContent = name;
+  impModal.classList.add('open'); $('#impCancel').focus();
+};
+const closeImp = () => { impModal.classList.remove('open'); impPending = null; };
+$('#impCancel').onclick = closeImp;
+$('#impOk').onclick = () => { if (impPending) send({ action: 'confirm_import', path: impPending.path, monitor: impPending.monitor }); closeImp(); };
+const stModal = $('#stModal');
+stModal.setAttribute('role', 'dialog'); stModal.setAttribute('aria-modal', 'true'); stModal.setAttribute('aria-labelledby', 'stTitleH');
+stModal.querySelector('h3').id = 'stTitleH';
+/* Nomes acessíveis: cada chave/controle herda o texto da linha em que está (leitores de tela e Ctrl+F). */
+document.querySelectorAll('label.switch input:not([aria-label])').forEach(i => {
+  const t = i.closest('.row')?.querySelector('.t')?.textContent.trim();
+  if (t) i.setAttribute('aria-label', t);
+});
+document.querySelectorAll('input[type=range]:not([aria-label])').forEach(i => {
+  const t = i.closest('.row')?.querySelector('.t')?.textContent.trim();
+  i.setAttribute('aria-label', t || 'Controle deslizante');
+});
+$('#ccShadertoy').onclick = () => { $('#stErr').textContent = ''; stModal.classList.add('open'); $('#stCode').focus(); };
+$('#stCancel').onclick = () => stModal.classList.remove('open');
+document.addEventListener('keydown', ev => { if (ev.key !== 'Escape') return; if ($('#renModal').classList.contains('open')) closeRename(); else if ($('#aiWiz').classList.contains('open')) { ai.wizDismissed = true; wizClose(); } else if (!$('#aiDrawer').hidden) aiDrawer(false); else if (impModal.classList.contains('open')) closeImp(); else if (stModal.classList.contains('open')) stModal.classList.remove('open'); });
+$('#stImport').onclick = () => {
+  const code = $('#stCode').value;
+  if (!code.trim()) { $('#stErr').textContent = 'Cole o código do shader.'; return; }
+  $('#stErr').textContent = '';
+  send({ action: 'import_shadertoy', title: $('#stTitle').value.trim() || 'Shadertoy', code, monitor: state.monitor });
+};
+/* ---------- Criar com IA ---------- */
+const AI_DEFAULT_MODEL = { claude: 'claude-opus-5-5', gemini: '', openrouter: '' };
+const AI_SENT = ' A cada rodada a conversa inteira (seu pedido, o código e as imagens renderizadas até ali) é enviada de novo; nada além disso sai do computador.';
+const AI_PRIVACY = {
+  claude: 'Seu pedido e os quadros renderizados são enviados à Anthropic.',
+  gemini: 'Seu pedido e os quadros renderizados são enviados ao Google. No uso gratuito, o Google pode usar esse conteúdo para melhorar os produtos dele: não escreva dados pessoais.',
+  openrouter: 'Seu pedido e os quadros renderizados vão ao OpenRouter e ao provedor do modelo escolhido; as políticas de dados variam por modelo.',
+};
+const AI_TOOL = { psl_render: 'Renderizando o shader', psl_compile: 'Compilando', web_preview: 'Renderizando a página web', render_still: 'Renderizando imagem em alta resolução', render_page_still: 'Gerando a imagem estática', save_wallpaper: 'Salvando' };
+const aiCfg = (config.ai = Object.assign({ provider: 'claude', models: {}, openrouter_vision: true }, config.ai || {}));
+const ai = { running: false, keys: {}, step: null, status: null, images: [] };
+
+function aiAdd(el) { $('#aiLog .ai-empty')?.remove(); $('#aiLog').appendChild(el); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return el; }
+function aiBubble(cls, text) { const d = document.createElement('div'); d.className = 'ai-msg ' + cls; d.textContent = text; return aiAdd(d); }
+/* Uma resposta do modelo pode levar minutos (ele escreve a página inteira): mostra há quanto tempo está esperando. */
+function aiStatus(text) {
+  if (!ai.status) { ai.status = document.createElement('div'); ai.status.className = 'ai-step'; aiAdd(ai.status); }
+  ai.statusText = text; ai.statusSince = Date.now();
+  const paint = () => {
+    if (!ai.status) return;
+    const s = Math.round((Date.now() - ai.statusSince) / 1000);
+    ai.status.innerHTML = '<span class="mark">…</span>'; ai.status.append(s >= 5 ? `${ai.statusText} ${s} s` : ai.statusText);
+  };
+  paint();
+  clearInterval(ai.statusTimer); ai.statusTimer = setInterval(paint, 1000);
+}
+function aiClearStatus() { clearInterval(ai.statusTimer); ai.status?.remove(); ai.status = null; }
+const AI_NAME = { claude: 'Claude', gemini: 'Gemini', openrouter: 'OpenRouter' };
+const aiAnyKey = () => Object.values(ai.keys).some(Boolean);
+function aiRefreshWho() {
+  const p = aiCfg.provider, el = $('#aiWho');
+  const has = !!ai.keys[p];
+  el.classList.toggle('off', !has);
+  el.textContent = has ? `${AI_NAME[p]} · ${aiCfg.models[p] || AI_DEFAULT_MODEL[p] || 'escolha um modelo na engrenagem'}` : `${AI_NAME[p]} · sem chave (clique na engrenagem)`;
+}
+function aiRefreshKey() {
+  const has = !!ai.keys[aiCfg.provider];
+  aiRefreshWho();
+  $('#aiKeyState').textContent = has ? 'Chave salva neste computador (Gerenciador de Credenciais do Windows).' : 'Nenhuma chave salva. Cole a sua e clique em Salvar.';
+  $('#aiKeyDel').hidden = !has;
+}
+function aiRefreshProvider() {
+  const p = aiCfg.provider;
+  document.querySelectorAll('#aiProv button').forEach(b => b.classList.toggle('active', b.dataset.v === p));
+  $('#aiPrivacy').textContent = AI_PRIVACY[p] + AI_SENT;
+  $('#aiModel').value = aiCfg.models[p] || AI_DEFAULT_MODEL[p];
+  $('#aiModel').placeholder = p === 'claude' ? 'claude-opus-5-5' : 'Clique em "Atualizar lista"';
+  $('#aiVisionRow').hidden = p !== 'openrouter';
+  $('#aiVision').checked = aiCfg.openrouter_vision !== false;
+  $('#aiModels').innerHTML = '';
+  aiRefreshKey();
+  aiRefreshWho();
+}
+function aiSetRunning(on) {
+  ai.running = on;
+  $('#aiGo').disabled = on; $('#aiNew').disabled = on; $('#aiStop').hidden = !on;
+  $('#aiGo').textContent = on ? 'Gerando…' : 'Gerar';
+}
+/* Limites: o usuário digita o que quiser, dentro da faixa que o motor aceita (e que ele confirma de volta). */
+const AI_STEPS_RANGE = [1, 100], AI_TOKENS_RANGE = [10000, 10000000];
+const aiK = n => n === 1e6 ? '1 milhão' : n > 1e6 ? (n / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' milhões' : (n / 1000).toLocaleString('pt-BR') + ' mil';
+function aiLimitsRefresh(steps, tokens) {
+  aiCfg.max_steps = steps; aiCfg.max_total_tokens = tokens;
+  $('#aiSteps').value = steps;
+  $('#aiTokens').value = Math.round(tokens / 1000);
+  $('#aiLimitsNow').textContent = `Agora: ${steps} ${steps === 1 ? 'rodada' : 'rodadas'} e ${aiK(tokens)} de tokens por geração.`;
+}
+aiLimitsRefresh(aiCfg.max_steps || 24, aiCfg.max_total_tokens || 1000000);
+const clampN = (v, [lo, hi], fallback) => Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : fallback;
+const aiSendLimits = () => {
+  const steps = clampN(+$('#aiSteps').value, AI_STEPS_RANGE, aiCfg.max_steps);
+  const tokens = clampN(+$('#aiTokens').value * 1000, AI_TOKENS_RANGE, aiCfg.max_total_tokens);
+  aiLimitsRefresh(steps, tokens);          // já mostra o valor ajustado; o motor confirma pelo evento `limits`
+  send({ action: 'ai_set_limits', max_steps: steps, max_total_tokens: tokens });
+};
+$('#aiSteps').onchange = aiSendLimits;
+$('#aiTokens').onchange = aiSendLimits;
+for (const id of ['#aiSteps', '#aiTokens']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+
+/* Parou por limite: um clique continua a mesma conversa. */
+function aiContinueButton() {
+  const row = document.createElement('div'); row.className = 'ai-card';
+  const b = document.createElement('button'); b.className = 'btn primary'; b.textContent = 'Continuar de onde parou';
+  b.onclick = () => {
+    row.remove();
+    const model = $('#aiModel').value.trim();
+    aiBubble('me', 'Continue de onde parou.'); aiSetRunning(true);
+    send({ action: 'ai_start', provider: aiCfg.provider, model, vision: $('#aiVision').checked, prompt: 'Continue from where you stopped and finish the wallpaper.' });
+  };
+  const t = document.createElement('div'); t.className = 'meta'; t.innerHTML = '<b></b><small></small>';
+  t.firstChild.textContent = 'Geração pausada pelo seu limite';
+  t.lastChild.textContent = 'Nada foi perdido. Aumente os limites acima se quiser que ela vá mais longe.';
+  row.append(t, b); aiAdd(row);
+}
+
+/* Trabalho que não chegou a ser salvo: sobra em disco e aqui, com como seguir. */
+function openInLab(name, code) {
+  showView('lab');
+  const f = document.querySelector('#view-lab iframe');
+  const go = () => f.contentWindow.postMessage({ studio: 'load', name, code }, '*');
+  if (f.contentDocument && f.contentDocument.readyState === 'complete' && f.contentWindow.code) go(); else f.addEventListener('load', go, { once: true });
+}
+function aiEmptyHint() {
+  const log = $('#aiLog');
+  if (log.children.length) return;
+  const d = document.createElement('div'); d.className = 'ai-empty';
+  d.innerHTML = '<b style="color:var(--text)">Descreva o wallpaper que você imagina.</b><br>A conversa aparece aqui. Se a geração parar antes de salvar, o resultado fica em <b>Criar › Rascunhos da IA</b>. Provedor, chave, modelo e limites ficam na engrenagem, no canto de cima.';
+  log.appendChild(d);
+}
+
+/* Gaveta de configuração (engrenagem) */
+function aiDrawer(open) {
+  $('#aiDrawer').hidden = !open; $('#aiScrim').hidden = !open;
+  $('#aiGear').setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) $('#aiDrawerClose').focus(); else $('#aiGear').focus();
+}
+$('#aiGear').onclick = () => aiDrawer($('#aiDrawer').hidden);
+$('#aiDrawerClose').onclick = () => aiDrawer(false);
+$('#aiScrim').onclick = () => aiDrawer(false);
+
+/* Assistente: sem nenhuma chave salva, guia da escolha do provedor até o primeiro "Gerar". */
+const WIZ_INFO = {
+  claude: { name: 'Claude (Anthropic)', blurb: 'Costuma escrever os melhores shaders e páginas. Pago por uso.', page: 'console.anthropic.com/settings/keys',
+    steps: ['Entre (ou crie uma conta) na página de chaves.', 'Adicione um crédito pequeno em <b>Billing</b>: sem saldo a chave não funciona.', 'Clique em <b>Create Key</b>, dê um nome e copie a chave (ela só aparece uma vez).'] },
+  gemini: { name: 'Gemini (Google)', blurb: 'Costuma ter uso gratuito limitado para começar. O Google pode usar o conteúdo enviado no uso gratuito.', page: 'aistudio.google.com/apikey',
+    steps: ['Entre com a sua conta Google na página de chaves.', 'Clique em <b>Create API key</b> (ou "Criar chave de API").', 'Copie a chave que aparece.'] },
+  openrouter: { name: 'OpenRouter', blurb: 'Um só acesso a vários modelos de provedores diferentes. Pago por uso.', page: 'openrouter.ai/keys',
+    steps: ['Entre (ou crie uma conta) na página de chaves.', 'Adicione crédito em <b>Credits</b>.', 'Clique em <b>Create Key</b>, dê um nome e copie a chave.'] },
+};
+const wiz = { step: 0, provider: 'claude', saving: false, models: [] };
+const WIZ_STEPS = ['Escolha o provedor', 'Crie a sua chave', 'Cole a chave', 'Escolha o modelo'];
+function wizRender() {
+  const st = wiz.step, p = wiz.provider, info = WIZ_INFO[p];
+  $('#wizStep').textContent = `Passo ${st + 1} de ${WIZ_STEPS.length}`;
+  $('#wizDots').innerHTML = WIZ_STEPS.map(() => '<i></i>').join('');
+  [...$('#wizDots').children].forEach((d, i) => d.classList.toggle('on', i === st));
+  $('#wizTitle').textContent = WIZ_STEPS[st];
+  const body = $('#wizBody'); body.textContent = '';
+  const add = (tag, html, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; e.innerHTML = html; body.appendChild(e); return e; };
+  $('#wizBack').style.visibility = st ? 'visible' : 'hidden';
+  $('#wizNext').textContent = st === 0 ? 'Próximo' : st === 1 ? 'Já tenho a chave' : st === 2 ? 'Salvar e continuar' : 'Começar a criar';
+  $('#wizNext').disabled = false;
+  if (st === 0) {
+    add('p', 'A IA precisa de uma <b>chave de API</b>: uma senha que você cria no site do provedor. Fica só neste computador, e o app só a usa para falar com o provedor que você escolher.');
+    const opts = add('div', '', 'wiz-opts');
+    for (const id of ['claude', 'gemini', 'openrouter']) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'wiz-opt' + (id === p ? ' sel' : '');
+      b.innerHTML = `<b>${WIZ_INFO[id].name}</b><span>${WIZ_INFO[id].blurb}</span>`;
+      b.onclick = () => { wiz.provider = id; wizRender(); };
+      opts.appendChild(b);
+    }
+  } else if (st === 1) {
+    add('p', `Vamos criar a chave do <b>${info.name}</b>.`);
+    const row = add('div', '', 'wiz-url');
+    row.innerHTML = `<code></code><button class="btn" type="button" id="wizOpen">Abrir a página</button><button class="btn" type="button" id="wizCopy">Copiar</button>`;
+    row.querySelector('code').textContent = info.page;
+    row.querySelector('#wizOpen').onclick = () => send({ action: 'ai_open_keypage', provider: p });
+    row.querySelector('#wizCopy').onclick = async () => { try { await navigator.clipboard.writeText('https://' + info.page); toast('Endereço copiado'); } catch { toast('Não consegui copiar.'); } };
+    add('ol', info.steps.map(x => `<li>${x}</li>`).join(''));
+    add('p', 'O preço depende do modelo e do provedor e a cobrança aparece só no painel dele. O app limita o uso de cada geração (veja na engrenagem).', 'wiz-note');
+  } else if (st === 2) {
+    add('p', `Cole aqui a chave do <b>${info.name}</b>. Ela é guardada no Gerenciador de Credenciais do Windows, nunca em arquivo.`);
+    const inp = document.createElement('input'); inp.className = 'search'; inp.id = 'wizKey'; inp.type = 'password'; inp.placeholder = 'Cole a chave aqui';
+    inp.autocomplete = 'off'; inp.spellcheck = false; body.appendChild(inp); inp.focus();
+    inp.onkeydown = e => { if (e.key === 'Enter') $('#wizNext').click(); };
+    add('p', '', 'wiz-note wiz-err').id = 'wizErr';
+  } else {
+    aiCfg.provider = p; aiRefreshProvider();
+    const cur = aiCfg.models[p] || AI_DEFAULT_MODEL[p] || '';
+    add('p', p === 'claude' ? 'Já vem um modelo padrão. Você pode trocar aqui ou depois, na engrenagem.' : 'Escolha um dos modelos que a sua conta pode usar (a lista vem do provedor).');
+    const sel = document.createElement('select'); sel.className = 'search'; sel.id = 'wizModel'; sel.style.width = '100%';
+    const fill = () => {
+      const ids = [...new Set([cur, ...wiz.models].filter(Boolean))];
+      sel.innerHTML = ids.length ? ids.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('') : '<option value="">Carregando a lista…</option>';
+      if (cur) sel.value = cur;
+      $('#wizNext').disabled = !sel.value;
+    };
+    sel.onchange = () => { $('#wizNext').disabled = !sel.value; };
+    body.appendChild(sel); wiz.fillModels = fill; fill();
+    send({ action: 'ai_models', provider: p });
+  }
+}
+function wizOpen() {
+  wiz.step = 0; wiz.provider = aiCfg.provider || 'claude'; wiz.models = [];
+  $('#aiWiz').classList.add('open'); wizRender();
+}
+function wizClose() { $('#aiWiz').classList.remove('open'); wiz.fillModels = null; }
+$('#wizSkip').onclick = () => { ai.wizDismissed = true; wizClose(); };
+$('#wizBack').onclick = () => { if (wiz.step) { wiz.step--; wizRender(); } };
+$('#wizNext').onclick = () => {
+  if (wiz.step === 2) {
+    const key = ($('#wizKey').value || '').trim();
+    if (!key) { $('#wizErr').textContent = 'Cole a chave primeiro.'; return; }
+    wiz.saving = true; $('#wizNext').disabled = true;
+    send({ action: 'ai_set_key', provider: wiz.provider, key });
+    return;                       // segue quando o motor confirma (evento `keys`)
+  }
+  if (wiz.step === 3) {
+    const m = ($('#wizModel').value || '').trim();
+    aiCfg.provider = wiz.provider; if (m) aiCfg.models[wiz.provider] = m; $('#aiModel').value = m;
+    aiRefreshProvider(); wizClose(); $('#aiPrompt').focus(); toast('Tudo pronto. Descreva o wallpaper.');
+    return;
+  }
+  wiz.step++; wizRender();
+};
+$('#aiWizOpen').onclick = () => { aiDrawer(false); wizOpen(); };
+/* Ao abrir a tela da IA sem nenhuma chave salva, o assistente abre sozinho (uma vez por sessão do Studio). */
+function aiMaybeWizard() {
+  if (ai.keysKnown && !aiAnyKey() && !ai.wizDismissed && !$('#aiWiz').classList.contains('open')) wizOpen();
+}
+function aiDraft(d, end) {
+  const card = document.createElement('div'); card.className = 'ai-card draft';
+  const meta = document.createElement('div'); meta.className = 'meta'; meta.innerHTML = '<b></b><small></small>';
+  meta.firstChild.textContent = end === 'completed' ? 'Esta versão não foi salva' : 'Rascunho recuperado (a geração parou antes de salvar)';
+  meta.lastChild.textContent = d.path ? 'Guardado em ' + d.path : 'Não consegui guardar em disco; copie o código abaixo.';
+  card.appendChild(meta);
+  const act = document.createElement('div'); act.className = 'actions';
+  const copy = document.createElement('button'); copy.className = 'btn'; copy.textContent = 'Copiar código';
+  copy.onclick = async () => { try { await navigator.clipboard.writeText(d.code); toast('Código copiado'); } catch { toast('Não consegui copiar; abra o arquivo guardado.'); } };
+  act.appendChild(copy);
+  if (d.kind === 'shader' && d.language === 'hlsl') {
+    const lab = document.createElement('button'); lab.className = 'btn primary'; lab.textContent = 'Abrir no Lab';
+    lab.onclick = () => openInLab('rascunho_ia', d.code); act.appendChild(lab);
+  } else if (d.kind === 'web' && d.path) {
+    const imp = document.createElement('button'); imp.className = 'btn primary'; imp.textContent = 'Importar como wallpaper';
+    imp.title = 'Copia a página para os seus wallpapers e aplica no monitor selecionado (pede confirmação)';
+    imp.onclick = () => send({ action: 'import_file', path: d.path, monitor: state.monitor }); act.appendChild(imp);
+  } else if (d.kind === 'shader') {
+    const imp = document.createElement('button'); imp.className = 'btn primary'; imp.textContent = 'Importar como wallpaper';
+    imp.title = 'Converte o shader e aplica no monitor selecionado (como "Colar do Shadertoy")';
+    imp.onclick = () => send({ action: 'import_shadertoy', title: 'Rascunho IA', code: d.code, monitor: state.monitor }); act.appendChild(imp);
+  }
+  card.appendChild(act); aiAdd(card);
+}
+
+function aiSaved(ev) {
+  const e = addImported(ev.path, ev.title);
+  renderChips(); renderGrid();
+  const card = document.createElement('div'); card.className = 'ai-card';
+  const shot = ai.images[ai.images.length - 1];
+  if (shot) { const i = document.createElement('img'); i.src = shot; card.appendChild(i); }
+  else card.insertAdjacentHTML('beforeend', `<div class="ph">${(e.ext || '').toUpperCase()}</div>`);
+  const meta = document.createElement('div'); meta.className = 'meta';
+  meta.innerHTML = '<b></b><small></small>'; meta.firstChild.textContent = ev.title; meta.lastChild.textContent = ev.path;
+  card.appendChild(meta);
+  const act = document.createElement('div'); act.className = 'actions';
+  const here = document.createElement('button'); here.className = 'btn primary'; here.textContent = 'Aplicar neste monitor';
+  here.onclick = () => { send({ action: 'set_wallpaper', monitor: state.monitor, path: ev.path }); state.active[state.monitor] = e; renderMonitors(); renderGrid(); refreshApply(); };
+  const all = document.createElement('button'); all.className = 'btn'; all.textContent = 'Em todos';
+  all.onclick = () => { send({ action: 'sync_all', path: ev.path }); monitors.forEach(m => state.active[m.id] = e); renderMonitors(); renderGrid(); refreshApply(); };
+  act.append(here, all);
+  if (/\.hlsl$/i.test(ev.path)) {                  // ajustar: abre o shader salvo no Lab (código e parâmetros)
+    const lab = document.createElement('button'); lab.className = 'btn'; lab.textContent = 'Ajustar no Lab';
+    lab.onclick = async () => {
+      try { const r = await fetch('/lab/open?path=' + encodeURIComponent(ev.path)); if (!r.ok) throw new Error(await r.text()); openInLab(ev.title, await r.text()); }
+      catch (err) { toast('Não consegui abrir no Lab: ' + err.message); }
+    };
+    act.appendChild(lab);
+  }
+  card.appendChild(act);
+  aiAdd(card);
+}
+window.onAiEvent = ev => {
+  switch (ev.type) {
+    case 'keys':
+      ai.keys = ev.keys || {}; ai.keysKnown = true; aiRefreshKey();
+      if (wiz.saving) {
+        wiz.saving = false;
+        if (ai.keys[wiz.provider]) { wiz.step = 3; wizRender(); }
+        else { $('#wizNext').disabled = false; const e = $('#wizErr'); if (e) e.textContent = 'Não consegui salvar a chave. Confira se copiou inteira e tente de novo.'; }
+      }
+      if ($('#view-ai').classList.contains('active')) aiMaybeWizard();
+      break;
+    case 'drafts': renderDrafts(ev.drafts || []); break;
+    case 'models': {
+      if (ev.kind !== aiCfg.provider) break;
+      if (ev.error) { toast(ev.error); break; }
+      wiz.models = (ev.models || []).map(m => m.id); if (wiz.fillModels) wiz.fillModels();
+      $('#aiModels').innerHTML = (ev.models || []).map(m => `<option value="${m.id.replace(/"/g, '&quot;')}">${(m.label || '').replace(/</g, '&lt;')}</option>`).join('');
+      toast(`${(ev.models || []).length} modelos. Clique no campo para escolher.`);
+      break;
+    }
+    case 'reset': $('#aiLog').innerHTML = ''; ai.status = ai.step = null; aiEmptyHint(); break;
+    case 'error': aiSetRunning(false); aiClearStatus(); aiBubble('err', ev.message); break;
+    case 'started': aiSetRunning(true); ai.images = []; break;
+    case 'thinking': aiStatus('Pensando…'); break;
+    case 'said': aiClearStatus(); aiBubble('', ev.text); break;
+    case 'tool': {
+      aiClearStatus();
+      const d = document.createElement('div'); d.className = 'ai-step';
+      d.innerHTML = '<span class="mark">⏳</span>'; d.append(`${AI_TOOL[ev.name] || ev.name} · ${ev.summary}`);
+      ai.step = aiAdd(d);
+      break;
+    }
+    case 'tool_done': {
+      const d = ai.step; if (!d) break;
+      const mark = d.querySelector('.mark'); mark.textContent = ev.ok ? '✓' : '✕'; mark.className = 'mark ' + (ev.ok ? 'ok' : 'no');
+      if (ev.text) { const o = document.createElement('span'); o.className = 'out'; o.textContent = ev.text; d.appendChild(o); }
+      if (ev.images && ev.images.length) {
+        ai.images = ev.images;
+        const box = document.createElement('div'); box.className = 'ai-shots';
+        for (const src of ev.images) { const i = document.createElement('img'); i.src = src; box.appendChild(i); }
+        d.appendChild(box);
+      }
+      d.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      break;
+    }
+    case 'saved': if (ev.auto) aiBubble('', 'A geração parou sem salvar, então guardei a melhor versão que ela tinha renderizado. Veja abaixo; para refinar, escreva o que mudar ou clique em Continuar.'); aiSaved(ev); break;
+    case 'limits': aiLimitsRefresh(ev.max_steps, ev.max_total_tokens); break;
+    case 'done': {
+      aiSetRunning(false); aiClearStatus();
+      if (ev.message) aiBubble(ev.end === 'failed' || ev.end === 'refused' ? 'err' : '', ev.message);
+      if (ev.end === 'cancelled') aiBubble('', 'Cancelado.');
+      if (ev.end === 'step_limit' || ev.end === 'token_limit') aiContinueButton();
+      if (ev.draft) { aiDraft(ev.draft, ev.end); loadDrafts(); }
+      const u = ev.usage || {}; const k = n => n >= 1000 ? (n / 1000).toFixed(1) + ' mil' : n;
+      if (ev.steps) { const s = document.createElement('div'); s.className = 'ai-usage'; s.textContent = `${ev.steps} ${ev.steps === 1 ? 'passo' : 'passos'} · ${k(u.input + (u.cached || 0))} tokens lidos · ${k(u.output)} escritos`; aiAdd(s); }
+      break;
+    }
+  }
+};
+document.querySelectorAll('#aiProv button').forEach(b => b.onclick = () => { aiCfg.provider = b.dataset.v; aiRefreshProvider(); });
+$('#aiModel').onchange = () => { aiCfg.models[aiCfg.provider] = $('#aiModel').value.trim(); };
+$('#aiVision').onchange = () => { aiCfg.openrouter_vision = $('#aiVision').checked; };
+$('#aiKeySave').onclick = () => { const k = $('#aiKey').value.trim(); if (!k) return toast('Cole a chave primeiro.'); send({ action: 'ai_set_key', provider: aiCfg.provider, key: k }); $('#aiKey').value = ''; toast('Chave salva'); };
+$('#aiKeyDel').onclick = () => { send({ action: 'ai_set_key', provider: aiCfg.provider, key: '' }); toast('Chave removida'); };
+$('#aiRefresh').onclick = () => { send({ action: 'ai_models', provider: aiCfg.provider }); toast('Buscando modelos…'); };
+$('#aiStop').onclick = () => { send({ action: 'ai_cancel' }); aiStatus('Cancelando…'); };
+$('#aiNew').onclick = () => send({ action: 'ai_new' });
+$('#aiGo').onclick = () => {
+  const prompt = $('#aiPrompt').value.trim();
+  if (!prompt) return toast('Descreva o wallpaper que você quer.');
+  if (!ai.keys[aiCfg.provider]) { toast(`Falta a chave do ${AI_NAME[aiCfg.provider]}.`); return wizOpen(); }
+  const model = $('#aiModel').value.trim(); aiCfg.models[aiCfg.provider] = model;
+  aiBubble('me', prompt); $('#aiPrompt').value = '';
+  aiSetRunning(true);
+  send({ action: 'ai_start', provider: aiCfg.provider, model, vision: $('#aiVision').checked, prompt });
+};
+$('#aiPrompt').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('#aiGo').click(); } });
+aiRefreshProvider();
+aiEmptyHint();
+loadDrafts();
+send({ action: 'ai_status' });
+window.onImportError = msg => { $('#stErr').textContent = msg; stModal.classList.add('open'); };
+$('#ccFile').onclick = () => send({ action: 'choose_file', monitor: state.monitor });
+$('#applyBtn').onclick = () => apply(false);
+$('#applyAllBtn').onclick = () => apply(true);
+if ($('#heroCamBtn')) $('#heroCamBtn').onclick = () => $('#stage').classList.toggle('cinema');
+$('#dockSsBtn').onclick = () => send({ action: 'start_screensaver' });
+$('#dockCloseBtn').onclick = () => setDockOpen(false);
+$('#dockOpenBtn').onclick = () => setDockOpen(true);
+if ($('#catPrev')) $('#catPrev').onclick = () => $('#grid').scrollBy({ left: -560, behavior: 'smooth' });
+if ($('#catNext')) $('#catNext').onclick = () => $('#grid').scrollBy({ left: 560, behavior: 'smooth' });
+if ($('#scrollDownBtn')) $('#scrollDownBtn').onclick = () => $('#fullGallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+if ($('#backToStageBtn')) $('#backToStageBtn').onclick = () => document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+$('#grid').addEventListener('wheel', e => {
+  if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+    e.preventDefault();
+    $('#grid').scrollLeft += (e.deltaX || e.deltaY) * 1.4;
+  }
+}, { passive: false });
+document.querySelectorAll('.dock-tabs button').forEach(b => {
+  b.onclick = () => switchDockTab(b.dataset.dtab);
+});
+function renderFeatured() {
+  const row = $('#featRow');
+  if (!row) return;
+  row.innerHTML = '';
+  // Destaques: os vídeos de fábrica primeiro; se faltar, completa com cenas do catálogo.
+  const picks = [...catalog.filter(e => e.kind === 'video' && e.id.startsWith('video:')),
+    ...['aurora', 'night_sky', 'rain_glass'].map(id => catalog.find(e => e.id === id))].filter(Boolean).slice(0, 3);
+  for (const e of picks) {
+    const card = document.createElement('button');
+    card.className = 'feat-card';
+    card.innerHTML = `<canvas width="384" height="216"></canvas>
+      <div class="feat-meta">
+        <span class="feat-badge">★ Destaque · ${esc(e.category)}</span>
+        <div><b>${esc(e.title)}</b><span>${esc(e.description)}</span></div>
+      </div>`;
+    card.onclick = () => {
+      select(e);
+      $('#stage')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    row.appendChild(card);
+    if (look(e) === 'video') {          // vídeo: um quadro do próprio arquivo no lugar do canvas do shader
+      const v = videoEl(e, false); v.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+      card.querySelector('canvas').replaceWith(v);
+    } else drawFrame(card.querySelector('canvas'), e, 6);
+  }
+}
+$('#freezeBtn').onclick = () => {
+  const e = state.selected;
+  if (!e || look(e) !== 'shader') return;
+  toast('Renderizando em 4K…');
+  send({ action: 'freeze_wallpaper', spec: e.path, monitor: state.monitor });
+};
+$('#search').oninput = e => {
+  state.query = e.target.value;
+  if ($('#fgSearch') && $('#fgSearch').value !== state.query) $('#fgSearch').value = state.query;
+  renderGrid();
+};
+if ($('#fgSearch')) {
+  $('#fgSearch').oninput = e => {
+    state.query = e.target.value;
+    if ($('#search') && $('#search').value !== state.query) $('#search').value = state.query;
+    renderGrid();
+  };
+}
+function renderStatus() {
+  const b = $('#pauseBtn');
+  b.innerHTML = state.paused ? '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>' : '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>';
+  b.title = state.paused ? 'Retomar' : 'Pausar';
+  const label = state.paused ? 'Pausado' : state.perfActive ? 'Modo desempenho' : 'Rodando';
+  const sub = `${monitors.length} monitor${monitors.length === 1 ? '' : 'es'} · ${config.target_fps || 30} fps`;
+  $('#status').classList.toggle('paused', state.paused);
+  $('#status span').textContent = label;
+  $('#statusFps').textContent = sub;
+  const dav = $('#dockAv');
+  if (dav) dav.classList.toggle('paused', state.paused);
+  const dt = $('#dockStatusTitle'), ds = $('#dockStatusSub');
+  if (dt) dt.textContent = label;
+  if (ds) ds.textContent = sub;
+}
+$('#pauseBtn').onclick = () => {
+  state.paused = !state.paused;
+  send({ action: 'toggle_pause' });
+  renderStatus();
+};
+addEventListener('dragenter', () => document.body.classList.add('dragging'));
+addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('dragging'); });
+addEventListener('drop', () => document.body.classList.remove('dragging'));
+addEventListener('resize', renderMonitors);
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+
+const SET_ICONS = {"fpsSeg": "<path d=\"M3 12a9 9 0 1 1 18 0\"/><path d=\"M12 12l4-4\"/><circle cx=\"12\" cy=\"12\" r=\"1.5\"/>", "speed": "<path d=\"M13 2L4 14h7l-1 8 9-12h-7z\"/>", "swatches": "<path d=\"M12 3a9 9 0 1 0 0 18c1.5 0 2-1 1.5-2-.6-1.2.2-2.5 1.5-2.5H17a4 4 0 0 0 4-4c0-5-4-9.5-9-9.5z\"/><circle cx=\"7.5\" cy=\"11\" r=\"1\"/><circle cx=\"10\" cy=\"7\" r=\"1\"/><circle cx=\"15\" cy=\"7.5\" r=\"1\"/>", "parallax": "<path d=\"M12 3l9 5-9 5-9-5z\"/><path d=\"M3 13l9 5 9-5\"/>", "mouse": "<rect x=\"6\" y=\"3\" width=\"12\" height=\"18\" rx=\"6\"/><path d=\"M12 7v4\"/>", "covered": "<rect x=\"3\" y=\"4\" width=\"14\" height=\"12\" rx=\"2\"/><rect x=\"9\" y=\"9\" width=\"12\" height=\"11\" rx=\"2\"/>", "battery": "<rect x=\"2\" y=\"8\" width=\"17\" height=\"9\" rx=\"2\"/><path d=\"M22 11v3M6 11v3M10 11v3\"/>", "lockscreen": "<rect x=\"5\" y=\"11\" width=\"14\" height=\"10\" rx=\"2\"/><path d=\"M8 11V8a4 4 0 0 1 8 0v3\"/>", "autostart": "<path d=\"M12 3v9\"/><path d=\"M6.3 7a8 8 0 1 0 11.4 0\"/>", "plEnabled": "<path d=\"M4 6h12M4 12h12M4 18h8\"/><path d=\"M19 9v8M19 17l-2-2M19 17l2-2\" />", "plInterval": "<circle cx=\"12\" cy=\"13\" r=\"8\"/><path d=\"M12 9v4l3 2M9 2h6\"/>", "plShuffle": "<path d=\"M3 7h4l10 10h4M3 17h4l3-3M14 10l3-3h4M18 4l3 3-3 3M18 14l3 3-3 3\"/>", "plFade": "<path d=\"M3 12h18M3 6h18M3 18h18\" opacity=\".4\"/><path d=\"M12 3v18\"/>", "plItems": "<rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\"/><path d=\"M17.5 14v7M14 17.5h7\"/>", "folderBtn": "<path d=\"M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>", "tourBtn": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M15.5 8.5l-2 5-5 2 2-5z\"/>"};
+function decorateSettings() {
+  document.querySelectorAll('.dock .row').forEach(row => {
+    const d = row.querySelector('.d');
+    if (d && !row.title) row.title = d.textContent.trim();
+  });
+  for (const [id, path] of Object.entries(SET_ICONS)) {
+    const el = document.getElementById(id);
+    const row = el && el.closest('.row');
+    if (!row || row.closest('.dock')) continue;
+    const lead = row.firstElementChild;
+    if (!lead || lead.querySelector('.lead-ic')) continue;
+    const ic = document.createElement('span');
+    ic.className = 'lead-ic';
+    ic.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+    const tx = document.createElement('div');
+    while (lead.firstChild) tx.appendChild(lead.firstChild);
+    lead.append(ic, tx);
+  }
+  const logo = document.querySelector('.brand svg');
+  $('#setLogo').outerHTML = logo.outerHTML.replace('<svg ', '<svg id="setLogo" ');
+  const chips = [`${monitors.length} monitor${monitors.length === 1 ? '' : 'es'}`, `${catalog.length} wallpapers`, `${config.target_fps || 30} fps`];
+  $('#setChips').innerHTML = chips.map(c => `<span>${c}</span>`).join('');
+}
+
+/* ---------- Sobre ---------- */
+function decorateAbout() {
+  $('#aboutLogo').outerHTML = document.querySelector('.brand svg').outerHTML.replace('<svg ', '<svg id="aboutLogo" ');
+  $('#aboutVer').textContent = 'Versão ' + (INIT.version || '—');
+  const shaders = catalog.filter(e => e.kind === 'shader').length, web = catalog.filter(e => e.kind === 'web').length;
+  $('#aboutStats').innerHTML = [[catalog.length, 'wallpapers'], [shaders, 'shaders'], [web, 'páginas web'], [monitors.length, monitors.length === 1 ? 'monitor' : 'monitores']]
+    .map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
+  $('#aboutTour').onclick = () => openTour();
+  $('#aboutFolder').onclick = () => send({ action: 'open_config_folder' });
+}
+
+/* ---------- Tour de boas-vindas ---------- */
+const TOUR = [
+  { title: 'Bem-vindo ao IsNotAEngine', text: 'Wallpapers animados de verdade, desenhados pela GPU direto no seu desktop. Em um minuto você vê onde fica cada coisa.', center: true },
+  { sel: '.stage', step: 'Prévia', title: 'Veja antes de aplicar', text: 'O palco mostra o wallpaper selecionado rodando ao vivo, com o mesmo código que vai para o desktop.' },
+  { sel: '.dock', step: 'Monitores', title: 'Escolha a tela', text: 'Clique num monitor e em Aplicar, ou use Aplicar em todos. A lista embaixo mostra o que está em cada tela.' },
+  { sel: '#grid', step: 'Galeria', title: 'Explore a galeria', text: 'Filtre por categoria ou busque pelo nome. Passe o mouse num card para animar a miniatura.' },
+  { sel: '.nav[data-view=settings]', step: 'Ajustes', title: 'Deixe do seu jeito', text: 'Taxa de quadros, cor de destaque, interação com o mouse, pausa automática, modo desempenho para jogos e playlist ficam em Ajustes.' },
+  { sel: '.nav[data-view=create]', step: 'Criar', title: 'Crie e traga os seus', text: 'Em Criar ficam o Lab, a IA, a importação de arquivos, o Shadertoy e páginas da internet, além dos seus wallpapers (que dá para remover).' },
+  { title: 'Tudo pronto', text: 'Escolha um wallpaper e aplique. Você pode rever este tour em Ajustes quando quiser.', center: true, last: true },
+];
+let tourIdx = 0;
+function openTour() {
+  showView('gallery');
+  $('#tourLogo').innerHTML = document.querySelector('.brand svg').outerHTML;
+  $('#tourDots').innerHTML = TOUR.map(() => '<i></i>').join('');
+  tourIdx = 0;
+  $('#tour').classList.add('open');
+  showTourStep();
+}
+function closeTour() {
+  $('#tour').classList.remove('open');
+  config.tour_done = true;
+  send({ action: 'set_tour_done', value: true });
+}
+function showTourStep() {
+  const st = TOUR[tourIdx], card = $('#tourCard'), hole = $('#tourHole');
+  $('#tourStep').textContent = st.step || (st.last ? '' : 'Boas-vindas');
+  $('#tourTitle').textContent = st.title;
+  $('#tourText').textContent = st.text;
+  $('#tourBack').style.visibility = tourIdx ? 'visible' : 'hidden';
+  $('#tourNext').textContent = st.last ? 'Começar' : tourIdx ? 'Próximo' : 'Fazer o tour';
+  $('#tourSkip').style.display = st.last ? 'none' : '';
+  [...$('#tourDots').children].forEach((d, i) => d.classList.toggle('on', i === tourIdx));
+  card.classList.toggle('center', !!st.center);
+  const target = st.sel && document.querySelector(st.sel);
+  if (!target) {
+    hole.classList.add('none');
+    Object.assign(hole.style, { left: innerWidth / 2 + 'px', top: innerHeight / 2 + 'px', width: '0px', height: '0px' });
+    requestAnimationFrame(() => {
+      card.style.left = (innerWidth - card.offsetWidth) / 2 + 'px';
+      card.style.top = (innerHeight - card.offsetHeight) / 2 + 'px';
+    });
+    return;
+  }
+  target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  setTimeout(() => {
+    if (TOUR[tourIdx] !== st) return;
+    const r = target.getBoundingClientRect(), pad = 8;
+    // Alvos maiores que a tela (a grade) são recortados à área visível
+    const top = Math.max(r.top, 8), bottom = Math.min(r.bottom, innerHeight - 8);
+    hole.classList.remove('none');
+    Object.assign(hole.style, { left: r.left - pad + 'px', top: top - pad + 'px', width: r.width + pad * 2 + 'px', height: bottom - top + pad * 2 + 'px' });
+    const cw = card.offsetWidth, ch = card.offsetHeight, gap = 18;
+    let x, y;
+    if (r.right + gap + cw < innerWidth - 12) { x = r.right + gap; y = top; }          // à direita
+    else if (bottom + gap + ch < innerHeight - 12) { x = r.left; y = bottom + gap; }  // abaixo
+    else if (top - gap - ch > 12) { x = r.left; y = top - gap - ch; }                 // acima
+    else { x = r.right - cw - 16; y = bottom - ch - 16; }                             // por dentro
+    card.style.left = Math.min(Math.max(12, x), innerWidth - cw - 12) + 'px';
+    card.style.top = Math.min(Math.max(12, y), innerHeight - ch - 12) + 'px';
+  }, 320);
+}
+$('#tourNext').onclick = () => { if (TOUR[tourIdx].last) closeTour(); else { tourIdx++; showTourStep(); } };
+$('#tourBack').onclick = () => { if (tourIdx) { tourIdx--; showTourStep(); } };
+$('#tourSkip').onclick = closeTour;
+$('#tourBtn').onclick = openTour;
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeAllDrops();
+  if (!$('#tour').classList.contains('open')) return;
+  if (e.key === 'Escape') closeTour();
+  else if (e.key === 'ArrowRight' || e.key === 'Enter') $('#tourNext').click();
+  else if (e.key === 'ArrowLeft') $('#tourBack').click();
+});
+addEventListener('resize', () => { if ($('#tour').classList.contains('open')) showTourStep(); });
+
+setDockOpen(innerWidth > 980);
+updateTintQuery();
+initSettings();
+decorateSettings();
+decorateAbout();
+renderStatus();
+renderChips();
+renderFeatured();
+renderMonitors();
+renderGrid();
+if ($('#heroMonStatus')) {
+  $('#heroMonStatus').style.cursor = 'pointer';
+  $('#heroMonStatus').title = 'Clique para localizar o wallpaper em execução na lista';
+  $('#heroMonStatus').onclick = () => {
+    const cur = state.active[state.monitor];
+    if (cur) select(cur, true);
+  };
+}
+select(state.active[state.monitor] || catalog[0], true);
+send({ action: 'select_monitor', monitor: state.monitor });
+if (!config.tour_done) setTimeout(openTour, 600);
+</script>
+</body>
+</html>

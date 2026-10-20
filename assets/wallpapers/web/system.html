@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="retint" content="#a6e3a1">
+<title>System · Dashboard</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c11; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Painel de terminal (estilo btop) desenhado numa grade de células monoespaçadas. Dados reais vêm de
+// `engine.system` (1 Hz); sem a ponte (prévia do Studio) roda em modo demonstração. Sem laço de animação:
+// uma única passada de desenho por segundo.
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const C = {
+  bg: '#0b0c11', line: '#2a2e3d', text: '#cdd6f4', dim: '#6c7086', faint: '#3b3f52', unlit: 'rgba(205,214,244,.055)',
+  green: [166, 227, 161], yellow: [249, 226, 175], red: [243, 139, 168], blue: [137, 180, 250], mauve: [203, 166, 247], teal: [148, 226, 213],
+};
+const N = 60;                                           // amostras do histórico (60 s)
+const hist = { cpu: [], down: [], up: [] };
+let S = null;                                           // última amostra
+let W = 0, H = 0, D = 1, fs = 16, cw = 10, ch = 24;     // pixels, escala e métricas da célula
+
+const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+// Gradiente de carga: verde -> amarelo -> vermelho (como no btop)
+const heat = t => t < .55 ? mix(C.green, C.yellow, t / .55) : mix(C.yellow, C.red, (t - .55) / .45);
+const gib = b => b / 1073741824;
+const fmtGB = b => gib(b).toFixed(gib(b) >= 100 ? 0 : 1) + ' GB';
+const fmtRate = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB/s' : b >= 1024 ? (b / 1024).toFixed(b >= 10240 ? 0 : 1) + ' KB/s' : Math.round(b) + ' B/s';
+const pct = v => String(Math.round(v)).padStart(3) + '%';
+
+function layout() {
+  D = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * D); cv.height = Math.round(H * D);
+  g.setTransform(D, 0, 0, D, 0, 0);
+  fs = Math.max(11, Math.round(H / 54));
+  g.font = `${fs}px "Cascadia Mono", "Cascadia Code", Consolas, monospace`;
+  cw = g.measureText('M').width; ch = Math.round(fs * 1.55);
+}
+
+// ---------- primitivas ----------
+const px = v => Math.round(v);
+function text(s, x, y, color = C.text, align = 'left') {
+  g.fillStyle = color; g.textAlign = align; g.textBaseline = 'alphabetic';
+  g.fillText(s, px(x), px(y));
+}
+// Moldura de 1 px com título embutido na borda superior
+function box(x, y, w, h, title, right) {
+  g.strokeStyle = C.line; g.lineWidth = 1;
+  g.strokeRect(px(x) + .5, px(y) + .5, px(w) - 1, px(h) - 1);
+  const ty = y + fs * 0.35;
+  if (title) { const tw = g.measureText(title).width + cw * 1.2; g.fillStyle = C.bg; g.fillRect(px(x + cw), px(y - 2), px(tw), 5); text(title, x + cw * 1.6, ty, rgb(C.green)); }
+  if (right) { const rw = g.measureText(right).width + cw * 1.2; g.fillStyle = C.bg; g.fillRect(px(x + w - cw - rw), px(y - 2), px(rw), 5); text(right, x + w - cw * 1.6, ty, C.dim, 'right'); }
+}
+// Matriz de LEDs: `values` (0..1) por coluna; cada coluna acende de baixo para cima com a cor do gradiente
+function ledGraph(x, y, w, h, cols, rows, values, colorAt, opts = {}) {
+  const cs = Math.min(w / cols, h / rows), gap = Math.max(1, Math.round(cs * 0.16));
+  const ox = x + (w - cs * cols), oy = y + (h - cs * rows);   // alinha à direita/embaixo
+  const base = opts.mirror ? 1 : 0;
+  for (let c = 0; c < cols; c++) {
+    const v = values[values.length - cols + c];
+    const lit = v == null ? 0 : Math.round(Math.max(0, Math.min(1, v)) * rows);
+    for (let r = 0; r < rows; r++) {
+      const on = r < lit;
+      g.fillStyle = on ? rgb(colorAt(rows <= 1 ? v : r / (rows - 1))) : C.unlit;
+      g.fillRect(px(ox + c * cs), px(oy + (rows - 1 - r) * cs), Math.max(1, Math.round(cs - gap)), Math.max(1, Math.round(cs - gap)));
+    }
+  }
+  return cs;
+}
+// Barra horizontal de LEDs (0..1)
+function ledBar(x, y, w, h, frac, cells, colorAt) {
+  const cs = Math.min(w / cells, h), gap = Math.max(1, Math.round(cs * 0.2)), lit = Math.round(Math.max(0, Math.min(1, frac)) * cells);
+  for (let i = 0; i < cells; i++) {
+    g.fillStyle = i < lit ? rgb(colorAt(i / (cells - 1))) : C.unlit;
+    g.fillRect(px(x + i * (w / cells)), px(y + (h - cs) / 2), Math.max(1, Math.round(w / cells - gap)), Math.max(2, Math.round(cs)));
+  }
+}
+
+// Relógio em matriz de pontos 5x7
+const GLYPH = {
+  0: ['01110', '10001', '10011', '10101', '11001', '10001', '01110'], 1: ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+  2: ['01110', '10001', '00001', '00010', '00100', '01000', '11111'], 3: ['11110', '00001', '00001', '01110', '00001', '00001', '11110'],
+  4: ['00010', '00110', '01010', '10010', '11111', '00010', '00010'], 5: ['11111', '10000', '11110', '00001', '00001', '10001', '01110'],
+  6: ['00110', '01000', '10000', '11110', '10001', '10001', '01110'], 7: ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+  8: ['01110', '10001', '10001', '01110', '10001', '10001', '01110'], 9: ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
+  ':': ['0', '0', '1', '0', '1', '0', '0'],
+};
+function dotClock(x, y, dot, str, color, dim) {
+  const gap = Math.max(1, Math.round(dot * 0.18)); let cx = x;
+  for (const chr of str) {
+    const gl = GLYPH[chr]; if (!gl) continue;
+    for (let r = 0; r < 7; r++) for (let c = 0; c < gl[r].length; c++) {
+      g.fillStyle = gl[r][c] === '1' ? color : dim;
+      g.fillRect(px(cx + c * dot), px(y + r * dot), Math.round(dot - gap), Math.round(dot - gap));
+    }
+    cx += (gl[0].length + (chr === ':' ? 1 : 1.2)) * dot;
+  }
+  return cx;
+}
+
+// ---------- desenho ----------
+const fmtDate = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+function draw() {
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  g.font = `${fs}px "Cascadia Mono", "Cascadia Code", Consolas, monospace`;
+  const padX = Math.round(W * 0.05 / cw) * cw, padY = Math.round(H * 0.07 / ch) * ch;
+  const ax = padX, ay = padY, aw = W - padX * 2, ah = H - padY * 2;
+  const now = new Date(), p2 = n => String(n).padStart(2, '0');
+
+  // Cabeçalho: relógio em pontos + data e uptime
+  const dot = Math.round(ch * 0.5);
+  const hh = dot * 7;
+  const endX = dotClock(ax, ay, dot, `${p2(now.getHours())}:${p2(now.getMinutes())}`, C.text, C.unlit);
+  text(p2(now.getSeconds()), endX + dot * 0.2, ay + hh - dot * 0.1, C.faint);
+  const upS = S ? S.uptime_secs : 0, ud = Math.floor(upS / 86400), uh = Math.floor(upS % 86400 / 3600), um = Math.floor(upS % 3600 / 60);
+  const up = ud ? `${ud}d ${uh}h` : uh ? `${uh}h ${um}m` : `${um}m`;
+  text(fmtDate.format(now), ax + aw, ay + hh - ch * 1.1, C.text, 'right');
+  text('no ar há ' + (S ? up : '—'), ax + aw, ay + hh, C.dim, 'right');
+
+  // Região dos painéis
+  const top = ay + hh + ch * 1.4, bottom = ay + ah - ch * 1.6;
+  const rowsAvail = Math.floor((bottom - top) / ch), colsAvail = Math.floor(aw / cw);
+  const leftCols = Math.round(colsAvail * 0.6), gapC = 2, rightCols = colsAvail - leftCols - gapC;
+  const lx = ax, lw = leftCols * cw, rx = ax + (leftCols + gapC) * cw, rw = rightCols * cw;
+  const memR = Math.round(rowsAvail * 0.30), diskR = Math.round(rowsAvail * 0.22), netR = rowsAvail - memR - diskR - 2;
+
+  // CPU
+  const cpu = S ? S.cpu : 0, cores = S ? S.cores : [];
+  box(lx, top, lw, rowsAvail * ch, 'cpu', S ? `${cores.length} threads` : '');
+  const ix = lx + cw * 2, iw = lw - cw * 4;
+  text('total', ix, top + ch * 1.7, C.dim);
+  text(pct(cpu), ix + cw * 6, top + ch * 1.7, rgb(heat(cpu / 100)));
+  const gTop = top + ch * 2.4, boxBottom = top + rowsAvail * ch - ch * 1.2;
+  const n = cores.length, perCol = Math.ceil(n / 2) || 1, colW = iw / 2;
+  const coresH = perCol * ch + ch * 1.0;                       // bloco dos núcleos (rótulo + barras)
+  const gH = Math.max(ch * 5, boxBottom - gTop - coresH - ch * 0.6);
+  const rowsLed = Math.max(8, Math.min(22, Math.round(gH / (iw / N))));
+  ledGraph(ix, gTop, iw, gH, N, rowsLed, hist.cpu.map(v => v / 100), heat);
+  text('100', ix - cw * 1.4, gTop + fs * 0.8, C.faint); text(' 50', ix - cw * 1.4, gTop + gH / 2 + fs * 0.4, C.faint); text('  0', ix - cw * 1.4, gTop + gH, C.faint);
+  // núcleos: duas colunas
+  const cTop = gTop + gH + ch * 0.9;
+  for (let i = 0; i < n; i++) {
+    const col = i < perCol ? 0 : 1, r = i - col * perCol;
+    const cx = ix + col * colW, cy = cTop + r * ch, v = cores[i];
+    text(String(i).padStart(2, '0'), cx, cy + fs * 0.9, C.dim);
+    ledBar(cx + cw * 3, cy, colW - cw * 12, ch, v / 100, Math.max(10, Math.floor((colW - cw * 12) / (cw * 0.9))), heat);
+    text(pct(v), cx + colW - cw * 3, cy + fs * 0.9, rgb(heat(v / 100)), 'right');
+  }
+
+  // MEM
+  const mp = S && S.mem_total ? S.mem_used / S.mem_total : 0;
+  box(rx, top, rw, memR * ch, 'mem', S ? pct(mp * 100).trim() : '');
+  const mi = rx + cw * 2, mw = rw - cw * 4;
+  ledBar(mi, top + ch * 1.0, mw, ch, mp, Math.max(12, Math.floor(mw / (cw * 0.9))), heat);
+  kv(mi, top + ch * 3.0, mw, 'usada', S ? fmtGB(S.mem_used) : '—', rgb(heat(mp)));
+  kv(mi, top + ch * 4.0, mw, 'livre', S ? fmtGB(S.mem_total - S.mem_used) : '—');
+  kv(mi, top + ch * 5.0, mw, 'total', S ? fmtGB(S.mem_total) : '—', C.dim);
+
+  // DISK
+  const dp = S && S.disk_total ? S.disk_used / S.disk_total : 0, dy = top + (memR + 1) * ch;
+  box(rx, dy, rw, diskR * ch, 'disco', 'C:');
+  ledBar(mi, dy + ch * 1.0, mw, ch, dp, Math.max(12, Math.floor(mw / (cw * 0.9))), heat);
+  kv(mi, dy + ch * 3.0, mw, 'usado', S ? `${fmtGB(S.disk_used)}  ${pct(dp * 100).trim()}` : '—', rgb(heat(dp)));
+  kv(mi, dy + ch * 4.0, mw, 'livre', S ? fmtGB(S.disk_total - S.disk_used) : '—');
+
+  // NET
+  const ny = dy + (diskR + 1) * ch, peak = Math.max(102400, ...hist.down, ...hist.up) * 1.15;
+  box(rx, ny, rw, netR * ch, 'rede', 'escala ' + fmtRate(peak) + ' (√)');
+  text('▼', mi, ny + ch * 1.7, rgb(C.blue)); text(S ? fmtRate(S.net_down) : '—', mi + cw * 2, ny + ch * 1.7, C.text);
+  text('▲', mi + mw / 2, ny + ch * 1.7, rgb(C.mauve)); text(S ? fmtRate(S.net_up) : '—', mi + mw / 2 + cw * 2, ny + ch * 1.7, C.text);
+  const gy = ny + ch * 2.4, gh = netR * ch - ch * 3.2, half = gh / 2;
+  ledGraph(mi, gy, mw, half - 1, N, 5, hist.down.map(v => lvl(v, peak)), t => mix(C.teal, C.blue, t));
+  ledGraph(mi, gy + half + 1, mw, half - 1, N, 5, hist.up.map(v => lvl(v, peak)), t => mix(C.mauve, C.red, t * 0.5));
+
+  // Barra de status
+  const sy = ay + ah;
+  g.fillStyle = C.line; g.fillRect(px(ax), px(sy - ch * 1.1), px(aw), 1);
+  text('● system', ax, sy, rgb(C.green));
+  const cur = (Math.floor(now.getTime() / 500) % 2) ? '█' : ' ';
+  text(`${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())} ${cur}`, ax + aw, sy, C.dim, 'right');
+}
+// Tráfego em escala de raiz: valores baixos continuam visíveis; qualquer tráfego acende pelo menos 1 LED
+function lvl(v, peak) { return v <= 0 ? 0 : Math.max(0.12, Math.sqrt(v / peak)); }
+function kv(x, y, w, k, v, vc = C.text) { text(k, x, y, C.dim); text(v, x + w, y, vc, 'right'); }
+
+// ---------- dados ----------
+function onSample(s) {
+  S = s;
+  const push = (a, v) => { a.push(v); while (a.length > N + 2) a.shift(); };
+  push(hist.cpu, s.cpu); push(hist.down, s.net_down); push(hist.up, s.net_up);
+  draw();
+}
+if (window.engine && engine.onSystem) {
+  engine.onSystem(onSample);
+} else {
+  // Prévia sem ponte: dados simulados (caminhada aleatória) só para a miniatura não ficar vazia.
+  let cpu = 30, mem = 0.48, down = 80000, up = 12000; const cores = Array.from({ length: 12 }, () => 30);
+  const walk = (v, lo, hi, k) => Math.max(lo, Math.min(hi, v + (Math.random() - .5) * k));
+  const demo = () => {
+    cpu = walk(cpu, 4, 90, 18); mem = walk(mem, .3, .8, .02); down = walk(down, 0, 900000, 200000); up = walk(up, 0, 120000, 30000);
+    for (let i = 0; i < cores.length; i++) cores[i] = walk(cores[i], 0, 100, 40);
+    onSample({ cpu, cores: cores.slice(), mem_used: mem * 32e9, mem_total: 32e9, disk_used: 447e9, disk_total: 500e9, net_down: down, net_up: up, uptime_secs: 44680 });
+  };
+  for (let i = 0; i < N; i++) demo();                  // histórico inicial, para o gráfico não nascer vazio
+  setInterval(demo, 1000);
+}
+setInterval(() => { if (S) draw(); }, 500);            // relógio e cursor (a cada 0,5 s); amostras redesenham por conta própria
+addEventListener('resize', () => { layout(); draw(); });
+layout(); draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+// RT_MANIFEST (24), id 1 = manifesto do executável.
+1 24 "app.manifest"
+
+// Ícone do aplicativo (id 1): Explorer, barra de tarefas, Studio e bandeja.
+1 ICON "assets/brand/icon.ico"
+
+// Versão do arquivo (aba Detalhes) — manter igual à do Cargo.toml (scripts/release-check.ps1 confere).
+1 VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILEOS 0x40004
+FILETYPE 1
+{
+  BLOCK "StringFileInfo"
+  {
+    BLOCK "041604B0"
+    {
+      VALUE "CompanyName", "4TyllaL"
+      VALUE "FileDescription", "IsNotAEngine - engine de wallpapers animados"
+      VALUE "FileVersion", "1.0.0.0"
+      VALUE "InternalName", "IsNotAEngine"
+      VALUE "LegalCopyright", "MIT License"
+      VALUE "OriginalFilename", "IsNotAEngine.exe"
+      VALUE "ProductName", "IsNotAEngine"
+      VALUE "ProductVersion", "1.0.0.0"
+    }
+  }
+  BLOCK "VarFileInfo"
+  {
+    VALUE "Translation", 0x0416, 0x04B0
+  }
+}

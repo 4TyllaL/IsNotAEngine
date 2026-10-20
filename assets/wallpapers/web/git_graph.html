@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="retint" content="#a6e3a1">
+<title>Git · Graph</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c11; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Grafo de commits (estilo gitk/GitKraken) em canvas. A topologia (ramos, forks, merges, tags) é simulada;
+// os assuntos dos commits são os do próprio repositório. Commits novos chegam a cada poucos segundos e empurram
+// o histórico para baixo com uma animação curta; fora disso a página fica parada (sem laço contínuo).
+// `?speed=N` acelera a simulação (só para desenvolvimento).
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const QS = new URLSearchParams(location.search);
+const SPEED = Math.max(0.25, +QS.get('speed') || 1);
+const DEV = QS.has('speed');
+const isHidden = () => document.hidden && !DEV;
+const COL = {
+  bg: '#0b0c11', line: '#2a2e3d', t: '#cdd6f4', d: '#6c7086', f: '#3b3f52',
+  g: [166, 227, 161], y: [249, 226, 175], r: [243, 139, 168], b: [137, 180, 250], m: [203, 166, 247], c: [148, 226, 213], p: [250, 179, 135], k: [245, 194, 231],
+};
+const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`, rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const colorOf = k => Array.isArray(COL[k]) ? rgb(COL[k]) : (COL[k] || COL.t);
+const FEATURE_COLORS = [COL.b, COL.m, COL.y, COL.c, COL.p, COL.k];
+
+const SUBJECTS = ["feat: playlist com fade e espelho do wallpaper no Windows", "feat(terminal_build): Terminal · Build — pipeline de CI com crates e testes…", "feat(system): dashboard refeito como painel de terminal (grade de células,…", "feat(system): System · Dashboard — métricas reais do sistema (CPU por núcle…", "refactor(catalog): lista refeita — só matrix e coding; fallback interno e i…", "refactor: separa a comparação de retângulos do OcclusionDetector e testa bo…", "refactor: extrai a política de pausa para pause.rs com testes", "refactor: remove allow(unsafe_op_in_unsafe_fn) do Studio e do WebWallpaper,…", "refactor: extrai importação de wallpapers para import.rs sem sobrescrever h…", "chore: CI no GitHub Actions e remove shader_cache/ do versionamento", "feat: panic hook registra panics no log", "fix(security): IPC do Studio só aceita a origem do próprio Studio e não log…", "fix(security): confina prévias do Studio às pastas de wallpapers e valida e…", "feat: shaders reagem ao cursor e prévias de wallpapers importados no Studio", "feat: pausa na bateria, CSP sem rede nos wallpapers web e README atualizado", "perf(web): vinil com caches (selo, sombra, reflexo), sem shadowBlur e DOM s…", "fix(studio): WebView do Studio nasce escondida junto com a janela (17% de C…", "perf(studio): suspende a WebView ao minimizar/esconder e pausa prévias quan…", "fix(web): comentário JS fechava a string crua do Rust (5ee662e não compilava)", "feat(web): cor do Studio chega aos wallpapers web (engine.tint/onTint e <me…", "feat(color): rotação de matiz global (// retint:) para a cor do Studio vale…", "fix(shaders): point_dunes (impacto refinado, céu), ink_vortex (brilho sem f…", "fix(shaders): liquid_chrome com reflexos nítidos de estúdio e origami_tunne…", "feat(web): vinil mais realista (sulcos em cache, brilho, braço articulado q…", "fix(shaders): aurora (montanhas em camadas e lago), topo_contours/relief (s…", "feat(catalog): topo_cobalt, plasma_flow e aurora_veil entram no catálogo", "feat(lab): aurora_veil v6 — corpo luminoso, borda suave, raios finos", "feat(lab): estudo C — Aurora Veil (v5, aguardando aprovação)", "feat(lab): estudo B — Plasma / Chromatic Flow (v4, aguardando aprovação)", "fix(lab): topo_cobalt apaga a linha nos extremos locais (ponto de 1px)", "feat(lab): estudo A — Topography Cobalt (v3, aguardando aprovação)", "feat(lab): Shader Lab CLI (--lab), parâmetros // param:, PNG, medições e co…", "feat: bloom, mídia, novos wallpapers web e ajustes nos shaders", "feat: catálogo de wallpapers embutido, Studio novo e correção dos wallpaper…", "feat: fix web wallpapers hosting with dual-surface WorkerW and overhaul vis…", "feat(engine): captura de áudio WASAPI, wallpapers web via WebView2 e relógi…", "feat(wallpapers): 22 shaders inspirados na galeria + Point Dunes refeito", "refactor(engine+studio): extrair render_all_viewports, oclusão com Studio f…", "feat(wallpapers): 13 novos shaders (black hole, rain glass, liquid chrome,…", "feat(pcb): PCB reescrita - barramentos 45 graus, vias, CIs QFP, SMDs, LEDs…", "feat(studio+shaders): shaders AAA com orientacao Y unificada, embed nativo…", "feat(studio): resolver dessincronia do preview com pipeline Dual-Context We…", "docs: atualizar README com Studio nativo, WMF video, System Tray e interati…", "feat: adicionar backend de video wallpaper com aceleracao de hardware via W…", "feat: adicionar bandeja do sistema (system tray) e persistencia em config.toml", "Interatividade: suporte a coordenadas de mouse e parallax em tempo real nos…", "Docs: atualiza README com arquitetura da Fase 4 e shaders por monitor", "Fase 4: Sistema de wallpapers procedurais, shaders externos (waves, cyber_g…", "Docs: atualiza README com arquitetura da Fase 3 e opções de execução", "Fase 3: Arquitetura do núcleo, logging estruturado, oclusão (pausa quando c…", "PoC 2b: D3D11 multi-monitor com DirectComposition e swapchains independente…", "PoC: desktop host validado no Win11 24H2+ (WorkerW filho do Progman, janela…"];
+const BRANCH_NAMES = ['feat/system-dashboard', 'fix/studio-hide', 'perf/web-fps', 'refactor/pause-policy', 'feat/terminal-build', 'fix/security-ipc', 'chore/ci-cache', 'feat/playlist-fade', 'fix/occlusion-edges', 'refactor/import', 'feat/lab-tint', 'perf/vinyl-cache', 'fix/autostart', 'feat/git-graph',
+  'fix/agora-vai', 'feat/nao-mexe-que-funciona', 'hotfix/sexta-17h', 'chore/limpar-depois', 'wip/nao-commita-isso', 'fix/funciona-na-minha-maquina'];
+const AUTHORS = ['ana', 'rafa', 'lucas', 'bia', 'dudu', 'nina', 'ctrl-z', 'o-estagiario'];
+// Piadinhas (≈1 em cada 6 commits): programação e coisas sem nada a ver
+const JOKES = ['fix: funciona na minha máquina', 'wip', 'asdfasdf', 'fix: agora vai', 'fix: agora vai (2)', 'fix: agora vai (3, de verdade)', 'revert: revert: revert: não mexe',
+  'feat: adiciona bug (documentado)', 'refactor: renomeia x para y e depois de volta para x', 'chore: apaga o comentário "não mexer nesse código"', 'docs: explica o que o código faz (mentira, o que deveria fazer)',
+  'perf: troca for por while e dobra a velocidade (placebo)', 'test: remove o teste que falhava', 'feat: tema escuro (porque sim)', 'fix: corrige o bug que eu mesmo criei na sexta',
+  'chore: bump de versão para ninguém reclamar', 'fix: typo (de novo)', 'fix: resolve o conflito de merge na sorte', 'feat: adiciona um gatinho no README', 'chore: o café acabou',
+  'fix: troca tabs por espaços (guerra santa)', 'docs: pizza com abacaxi é aceitável (discutível)', 'chore: apaga o que ninguém sabe para que serve (ninguém reclamou ainda)', 'fix: desliga e liga de novo'];
+const JOKE_TAG_SUFFIX = ['-final', '-final-agora-vai', '-rc1-de-verdade', '-sexta-17h', '-nao-mexe'];
+
+// ---------- simulação do histórico ----------
+let rnd = (() => { let a = (Date.now() % 4294967296) >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
+const pick = a => a[Math.floor(rnd() * a.length)];
+const hex = n => Array.from({ length: n }, () => '0123456789abcdef'[Math.floor(rnd() * 16)]).join('');
+const commits = [];                        // do mais antigo ao mais novo; id = índice
+const branches = [];                       // ramos de feature ativos: { name, lane, color, tip, count, target }
+const merged = [];                         // { name, pr }
+const tags = [];                           // { name, id }
+let mainTip = -1, pr = 130 + Math.floor(rnd() * 30), ver = [0, 4, 1 + Math.floor(rnd() * 3)], colorIdx = 0, subjIdx = Math.floor(rnd() * SUBJECTS.length);
+const recentJokes = [];
+const nextSubject = () => {
+  if (rnd() < 0.17) {                                   // piada, sem repetir uma que ainda está na tela
+    const j = pick(JOKES.filter(x => !recentJokes.includes(x)));
+    recentJokes.push(j); if (recentJokes.length > 16) recentJokes.shift(); return j;
+  }
+  return SUBJECTS[(subjIdx++) % SUBJECTS.length];
+};
+const freeLane = () => { for (let l = 1; l <= 5; l++) if (!branches.some(b => b.lane === l)) return l; return 0; };
+
+function add(o) {
+  const c = { id: commits.length, hash: hex(7), author: pick(AUTHORS), t: 0, merge: false, ...o };
+  commits.push(c); return c;
+}
+function stepSim(t) {
+  const act = branches, r = rnd();
+  const ready = act.filter(b => b.count >= b.target);
+  if (mainTip < 0) { mainTip = add({ lane: 0, color: COL.g, parents: [], subj: 'chore: initial commit', t }).id; return; }
+  if (ready.length && r < 0.6) {                                    // merge de um ramo pronto
+    const b = ready[0]; pr++;
+    const c = add({ lane: 0, color: COL.g, parents: [mainTip, b.tip], subj: `Merge pull request #${pr} from isnotaengine/${b.name}`, merge: true, mergeOf: b.name, t });
+    mainTip = c.id; branches.splice(branches.indexOf(b), 1); merged.push({ name: b.name, pr });
+    if (rnd() < 0.22) { ver[2]++; if (rnd() < 0.3) { ver[1]++; ver[2] = 0; } tags.push({ name: `v${ver.join('.')}` + (rnd() < 0.3 ? pick(JOKE_TAG_SUFFIX) : ''), id: c.id }); }
+    return;
+  }
+  const lane = freeLane();
+  if (lane && act.length < 4 && (act.length === 0 || r < 0.42)) {  // novo ramo a partir da main
+    const name = pick(BRANCH_NAMES.filter(n => !act.some(b => b.name === n)));
+    const b = { name, lane, color: FEATURE_COLORS[colorIdx++ % FEATURE_COLORS.length], tip: -1, count: 0, target: 2 + Math.floor(rnd() * 4) };
+    const c = add({ lane, color: b.color, parents: [mainTip], subj: nextSubject(), branch: name, t });
+    b.tip = c.id; b.count = 1; branches.push(b); return;
+  }
+  if (act.length && r < 0.9) {                                       // commit num ramo
+    const b = pick(act), c = add({ lane: b.lane, color: b.color, parents: [b.tip], subj: nextSubject(), branch: b.name, t });
+    b.tip = c.id; b.count++; return;
+  }
+  mainTip = add({ lane: 0, color: COL.g, parents: [mainTip], subj: nextSubject(), t }).id;   // commit direto na main
+}
+// histórico inicial: 64 commits distribuídos nas últimas 12 h (horários crescentes, o último há ~1 min)
+{ const now = Date.now(), N0 = 64; for (let i = 0; i < N0; i++) stepSim(now - 12 * 3600e3 + (i / (N0 - 1)) * (12 * 3600e3 - 60e3) + (rnd() - 0.5) * 8 * 60e3 * (i > 0 && i < N0 - 1 ? 1 : 0)); }
+
+// ---------- desenho ----------
+let W = 0, H = 0, D = 1, fs = 16, lh = 24, cw = 9, rh = 56;
+const FONT = (b, k = 1) => `${b ? 'bold ' : ''}${(fs * k).toFixed(1)}px "Cascadia Mono", "Cascadia Code", Consolas, monospace`;
+const px = Math.round;
+function layout() {
+  D = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * D); cv.height = Math.round(H * D); g.setTransform(D, 0, 0, D, 0, 0);
+  g.textRendering = 'optimizeSpeed'; g.fontKerning = 'none';   // sem ligaturas: `--` não pode virar um travessão
+  fs = Math.max(11, Math.round(H / 54)); g.font = FONT(false); cw = g.measureText('M').width; lh = Math.round(fs * 1.5); rh = Math.round(fs * 2.9);
+  paintAll();
+}
+function geom() {
+  const padX = Math.round(W * 0.045 / cw) * cw, padY = Math.round(H * 0.06 / lh) * lh;
+  const ax = padX, ay = padY, aw = W - padX * 2, bottom = H - padY - lh * 1.8;
+  const logW = Math.round(aw * 0.7 / cw) * cw, gap = cw * 2;
+  return { ax, ay, aw, bottom, logW, panX: ax + logW + gap, panW: aw - logW - gap, h: bottom - ay };
+}
+function box(x, y, w, h, title, right) {
+  g.strokeStyle = COL.line; g.lineWidth = 1; g.strokeRect(px(x) + .5, px(y) + .5, px(w) - 1, px(h) - 1); g.font = FONT(false);
+  if (title) { const tw = g.measureText(title).width + cw * 1.2; g.fillStyle = COL.bg; g.fillRect(px(x + cw), px(y - 2), px(tw), 5); g.fillStyle = rgb(COL.g); g.textAlign = 'left'; g.fillText(title, px(x + cw * 1.6), px(y + fs * 0.35)); }
+  if (right) { const rw = g.measureText(right).width + cw * 1.2; g.fillStyle = COL.bg; g.fillRect(px(x + w - cw - rw), px(y - 2), px(rw), 5); g.fillStyle = COL.d; g.textAlign = 'right'; g.fillText(right, px(x + w - cw * 1.6), px(y + fs * 0.35)); g.textAlign = 'left'; }
+}
+const ago = ms => { const m = Math.floor(ms / 60000); return m < 1 ? 'agora' : m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m / 60)} h` : `${Math.floor(m / 1440)} d`; };
+const fit = (s, maxPx) => { g.font = FONT(false); if (g.measureText(s).width <= maxPx) return s; let n = s.length; while (n > 1 && g.measureText(s.slice(0, n) + '…').width > maxPx) n--; return s.slice(0, n) + '…'; };
+
+let anim = 0;                              // 0..1 do deslocamento de entrada (1 = recém-chegado, 0 = parado)
+let dirty = true;
+const TYPE_COLOR = { feat: COL.g, fix: COL.p, refactor: COL.m, perf: COL.c, chore: COL.d, docs: COL.b, test: COL.y };
+
+function paintLog() {
+  const G = geom(); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  g.fillStyle = COL.bg; g.fillRect(G.ax - 2, G.ay - 8, G.logW + 4, G.h + 12);
+  box(G.ax, G.ay, G.logW, G.h, 'git log --graph --decorate', 'main');
+  const n = commits.length, newest = n - 1, rows = Math.ceil((G.h - rh * 0.4) / rh) + 2;
+  const laneW = Math.round(cw * 2.6), gx = G.ax + cw * 2.5, textX = gx + 6 * laneW + cw * 1.5, maxX = G.ax + G.logW - cw * 2;
+  const y0 = G.ay + rh * 0.9, shift = anim * rh;
+  const Y = row => y0 + row * rh - shift, X = lane => gx + lane * laneW + laneW / 2;
+  const rowOf = id => newest - id;
+  g.save(); g.beginPath(); g.rect(G.ax + 3, G.ay + lh * 0.75, G.logW - 6, G.h - lh * 0.75 - 3); g.clip();      // abaixo do título: a linha que entra não invade a moldura
+
+  // arestas (por baixo dos nós)
+  g.lineWidth = Math.max(2, Math.round(fs * 0.13)); g.lineCap = 'round'; g.lineJoin = 'round';
+  for (let r = -1; r < rows; r++) {
+    const c = commits[newest - r]; if (!c) continue;
+    c.parents.forEach((pid, k) => {
+      const p = commits[pid]; if (!p) return;
+      const x1 = X(c.lane), y1 = Y(r), x2 = X(p.lane), y2 = Y(rowOf(pid)), col = (k === 1 ? p.color : (c.lane ? c.color : p.color));
+      g.strokeStyle = rgba(col, 0.9); g.beginPath(); g.moveTo(x1, y1);
+      if (x1 === x2) g.lineTo(x2, y2);
+      else if (k === 1) { const cy = y1 + rh * 0.75; g.bezierCurveTo(x1, y1 + rh * 0.45, x2, y1 + rh * 0.3, x2, cy); g.lineTo(x2, y2); }       // merge: curva junto ao filho
+      else { const cy = y2 - rh * 0.75; g.lineTo(x1, cy); g.bezierCurveTo(x1, y2 - rh * 0.3, x2, y2 - rh * 0.45, x2, y2); }                       // fork: curva junto ao pai
+      g.stroke();
+    });
+  }
+  // nós e textos
+  const tipOf = new Map(); for (const b of branches) tipOf.set(b.tip, b);
+  const tagOf = new Map(); for (const t of tags) { if (!tagOf.has(t.id)) tagOf.set(t.id, []); tagOf.get(t.id).push(t.name); }
+  const now = Date.now();
+  for (let r = -1; r < rows; r++) {
+    const c = commits[newest - r]; if (!c) continue;
+    const y = Y(r), x = X(c.lane); if (y < G.ay - rh || y > G.ay + G.h + rh) continue;
+    const fresh = r === 0 ? Math.max(0, 1 - anim) : 1;             // o recém-chegado aparece com fade
+    g.globalAlpha = r < 0 ? 0 : 0.25 + 0.75 * fresh;
+    // nó
+    const rad = Math.max(4, Math.round(fs * 0.3));
+    if (c.merge) { g.fillStyle = COL.bg; g.strokeStyle = rgb(c.color); g.lineWidth = 2.2; g.beginPath(); g.arc(x, y, rad + 1, 0, 6.2832); g.fill(); g.stroke(); g.fillStyle = rgb(c.color); g.beginPath(); g.arc(x, y, rad * 0.4, 0, 6.2832); g.fill(); }
+    else { g.fillStyle = rgb(c.color); g.beginPath(); g.arc(x, y, rad, 0, 6.2832); g.fill(); g.strokeStyle = COL.bg; g.lineWidth = 2; g.stroke(); }
+    if (c.id === mainTip) { g.strokeStyle = rgba(COL.g, 0.35); g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, rad + 5, 0, 6.2832); g.stroke(); }
+    // linha 1: assunto + selos
+    const ty = y - fs * 0.15; let tx = textX;
+    const m = /^(feat|fix|refactor|perf|chore|docs|test)(\([^)]*\))?:\s*/.exec(c.subj);
+    g.font = FONT(false);
+    if (m) { g.fillStyle = rgb(TYPE_COLOR[m[1]] || COL.t); g.font = FONT(true); const pre = m[0].trimEnd() + ' '; g.fillText(pre, px(tx), px(ty)); tx += g.measureText(pre).width; }
+    const rest = m ? c.subj.slice(m[0].length) : c.subj;
+    g.font = FONT(false); g.fillStyle = c.merge ? COL.d : COL.t; g.fillText(fit(rest, Math.max(cw * 8, maxX - tx - cw * 30)), px(tx), px(ty)); tx += Math.min(g.measureText(rest).width, Math.max(cw * 8, maxX - tx - cw * 30)) + cw * 1.2;
+    // selos: ponta de ramo, main/HEAD e tags
+    const badges = [];
+    if (c.id === mainTip) badges.push({ t: 'HEAD → main', c: COL.g });
+    const b = tipOf.get(c.id); if (b) badges.push({ t: b.name, c: b.color });
+    for (const tg of (tagOf.get(c.id) || [])) badges.push({ t: tg, c: COL.y, tag: true });
+    for (const bd of badges) { const bw = drawBadge(tx, ty, bd, maxX); if (!bw) break; tx += bw + cw * 0.6; }
+    // linha 2: hash, autor, tempo
+    g.font = FONT(false, 0.88); g.fillStyle = rgba(COL.y, 0.75); g.fillText(c.hash, px(textX), px(y + fs * 1.05));
+    g.fillStyle = COL.d; g.fillText(`${c.author}  ·  ${ago(now - c.t)}`, px(textX + cw * 8.4), px(y + fs * 1.05));
+    g.globalAlpha = 1;
+  }
+  g.restore(); dirty = false;
+}
+function drawBadge(x, y, bd, maxX) {
+  g.font = FONT(false, 0.86); const label = (bd.tag ? '◆ ' : '') + bd.t, tw = g.measureText(label).width, bw = tw + cw * 1.2, bh = fs * 1.15;
+  if (x + bw > maxX) return 0;
+  g.fillStyle = rgba(bd.c, 0.12); g.strokeStyle = rgba(bd.c, 0.7); g.lineWidth = 1;
+  const rx = px(x), ry = px(y - bh * 0.78), r = bh / 2; g.beginPath(); g.moveTo(rx + r, ry); g.arcTo(rx + bw, ry, rx + bw, ry + bh, r); g.arcTo(rx + bw, ry + bh, rx, ry + bh, r); g.arcTo(rx, ry + bh, rx, ry, r); g.arcTo(rx, ry, rx + bw, ry, r); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = rgb(bd.c); g.textAlign = 'left'; g.fillText(label, px(x + cw * 0.6), px(y)); return bw;
+}
+function paintPanel() {
+  const G = geom(); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  g.fillStyle = COL.bg; g.fillRect(G.panX - 2, G.ay - 8, G.panW + 4, G.h + 12);
+  box(G.panX, G.ay, G.panW, G.h, 'branches', branches.length + ' ativos');
+  const x = G.panX + cw * 2, w = G.panW - cw * 4; let y = G.ay + lh * 1.8;
+  const label = (s) => { g.font = FONT(false, 0.88); g.fillStyle = COL.d; g.textAlign = 'left'; g.fillText(s, px(x), px(y)); y += lh * 1.15; };
+  const row = (dot, name, right, dim) => { g.fillStyle = rgb(dot); g.beginPath(); g.arc(x + 5, y - fs * 0.3, 4, 0, 6.2832); g.fill(); g.font = FONT(false); g.fillStyle = dim ? COL.d : COL.t; g.textAlign = 'left'; g.fillText(fit(name, w - cw * 8), px(x + cw * 2.4), px(y)); g.fillStyle = COL.d; g.textAlign = 'right'; g.fillText(right, px(x + w), px(y)); y += lh; };
+  row(COL.g, 'main', '#' + commits.length, false);
+  for (const b of branches.slice().sort((a, b2) => a.lane - b2.lane)) row(b.color, b.name, '+' + b.count, false);
+  y += lh * 0.6; label('merges recentes');
+  for (const m of merged.slice(-5).reverse()) row(COL.g, m.name, '#' + m.pr, true);
+  y += lh * 0.6; label('tags');
+  const shown = tags.slice(-4).reverse(); if (!shown.length) { g.font = FONT(false); g.fillStyle = COL.f; g.fillText('—', px(x), px(y)); y += lh; }
+  for (const t of shown) { g.font = FONT(false); g.fillStyle = rgb(COL.y); g.textAlign = 'left'; g.fillText('◆ ' + t.name, px(x), px(y)); g.fillStyle = COL.d; g.textAlign = 'right'; g.fillText(commits[t.id].hash, px(x + w), px(y)); y += lh; }
+  y += lh * 0.6; label('atividade');
+  const byHour = new Array(12).fill(0); const now = Date.now(); for (const c of commits) { const h = Math.floor((now - c.t) / 3600e3); if (h >= 0 && h < 12) byHour[11 - h]++; }
+  const mx = Math.max(1, ...byHour), cell = w / 12;
+  for (let i = 0; i < 12; i++) { const lit = Math.round(byHour[i] / mx * 5); for (let k = 0; k < 5; k++) { g.fillStyle = k < lit ? rgb(COL.g) : 'rgba(205,214,244,.055)'; g.fillRect(px(x + i * cell), px(y + (4 - k) * (lh * 0.42)), Math.max(2, px(cell - 3)), px(lh * 0.42 - 2)); } }
+  y += lh * 2.7; g.font = FONT(false, 0.85); g.fillStyle = COL.f; g.textAlign = 'left'; g.fillText('commits por hora, 12 h', px(x), px(y));
+}
+const fmtDate = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
+function paintBar() {
+  const G = geom(), by = G.bottom + lh * 1.2; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  g.fillStyle = COL.bg; g.fillRect(G.ax - 2, G.bottom + lh * 0.1, G.aw + 4, lh * 1.8);
+  g.fillStyle = COL.line; g.fillRect(px(G.ax), px(G.bottom + lh * 0.2), px(G.aw), 1);
+  g.font = FONT(true); g.fillStyle = rgb(COL.g); g.fillRect(px(G.ax), px(by - lh * 0.75), px(cw * 6), px(lh * 0.95)); g.fillStyle = '#0b0c11'; g.fillText(' git ', px(G.ax + cw * 0.5), px(by));
+  g.font = FONT(false); g.fillStyle = COL.d; g.fillText('0:graph', px(G.ax + cw * 8), px(by)); g.fillStyle = COL.t; g.fillText('*', px(G.ax + cw * 15), px(by)); g.fillStyle = COL.d; g.fillText('1:log-  2:diff', px(G.ax + cw * 17), px(by));
+  const d = new Date(), p2 = n => String(n).padStart(2, '0');
+  g.textAlign = 'right'; g.fillText(`${fmtDate.format(d)}  │  ${p2(d.getHours())}:${p2(d.getMinutes())}`, px(G.ax + G.aw), px(by));
+}
+function paintAll() { g.fillStyle = COL.bg; g.fillRect(0, 0, W, H); paintLog(); paintPanel(); paintBar(); }
+
+// ---------- eventos ----------
+let animating = false;
+function ease(t) { return 1 - Math.pow(1 - t, 3); }
+function runAnim() {
+  if (animating) return; animating = true; const t0 = performance.now();
+  (function frame(now) {
+    const p = Math.min(1, (now - t0) / 480); anim = 1 - ease(p); paintLog();
+    if (p < 1 && !isHidden()) requestAnimationFrame(frame); else { anim = 0; animating = false; paintLog(); paintPanel(); }
+  })(t0);
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms / SPEED));
+const visible = () => isHidden() ? new Promise(r => document.addEventListener('visibilitychange', function f() { if (!isHidden()) { document.removeEventListener('visibilitychange', f); r(); } })) : Promise.resolve();
+(async () => {
+  for (;;) {
+    await visible(); await sleep(3600 + rnd() * 5200);
+    await visible(); stepSim(Date.now()); anim = 1;
+    runAnim(); paintPanel();
+  }
+})();
+setInterval(() => { if (!isHidden() && !animating) { paintLog(); paintPanel(); } }, 20000);   // atualiza os "há N min"
+setInterval(() => { if (!isHidden()) paintBar(); }, 1000);
+addEventListener('resize', layout);
+layout();
+</script>
+</body>
+</html>

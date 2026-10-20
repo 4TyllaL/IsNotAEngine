@@ -1,0 +1,106 @@
+name: Release
+
+# Publica uma versão ao empurrar uma tag `vX.Y.Z` (ex.: `git tag v0.2.0 && git push --tags`).
+# A tag precisa bater com a versão do Cargo.toml e do instalador (scripts/release-check.ps1).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # Os mesmos gates do CI: nada é empacotado se o lint, os testes ou a auditoria falharem.
+  gate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Verificador de release (autoteste e versões)
+        shell: pwsh
+        run: |
+          ./scripts/release-check.ps1 -SelfTest
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { '' }
+          ./scripts/release-check.ps1 -Phase pre -Tag $tag
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked --release
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+  windows:
+    needs: [gate, audit]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Versão
+        id: ver
+        shell: pwsh
+        run: |
+          # A versão publicada é SEMPRE a do Cargo.toml (validada contra a tag no job `gate`).
+          $cargo = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          "version=$cargo" >> $env:GITHUB_OUTPUT
+      - run: cargo build --locked --release
+      - name: Assinar o executável (opcional)
+        id: sign_exe
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+          TIMESTAMP_URL: ${{ vars.WINDOWS_SIGNING_TIMESTAMP_URL }}
+        run: ./scripts/sign-artifact.ps1 -Path target\release\IsNotAEngine.exe
+      - name: Instalador (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=${{ steps.ver.outputs.version }}" installer\IsNotAEngine.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC falhou ($LASTEXITCODE)" }
+      - name: Assinar o instalador (opcional)
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+          TIMESTAMP_URL: ${{ vars.WINDOWS_SIGNING_TIMESTAMP_URL }}
+        run: ./scripts/sign-artifact.ps1 -Path "dist\IsNotAEngine-Setup-${{ steps.ver.outputs.version }}.exe"
+      - name: Pacote portátil
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path target\release\IsNotAEngine.exe, README.md -DestinationPath "dist\IsNotAEngine-${{ steps.ver.outputs.version }}-portable.zip"
+      - name: Inventário de dependências
+        shell: pwsh
+        run: |
+          # Nome, versão e licença de cada crate resolvido para o alvo Windows (cargo metadata).
+          $m = cargo metadata --locked --format-version 1 --filter-platform x86_64-pc-windows-msvc | ConvertFrom-Json
+          $ids = $m.resolve.nodes.id
+          $m.packages | Where-Object { $ids -contains $_.id } | Sort-Object name, version | ForEach-Object { "{0} {1} {2}" -f $_.name, $_.version, $(if ($_.license) { $_.license } else { 'sem-licenca-declarada' }) } | Out-File dist\DEPENDENCIES.txt -Encoding ascii
+      - name: Somas de verificação
+        shell: pwsh
+        run: |
+          # Depois de TUDO empacotado; a lista é montada antes de criar o arquivo de somas.
+          $lines = Get-ChildItem dist -File | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" }
+          $lines | Out-File dist\SHA256SUMS.txt -Encoding ascii
+      - name: Conferir a release (arquivos, somas e inicialização fora do projeto)
+        shell: pwsh
+        run: |
+          $signed = ('${{ steps.sign_exe.outputs.signed }}' -eq 'true')
+          if ($signed) { ./scripts/release-check.ps1 -Phase post -RequireSigned } else { ./scripts/release-check.ps1 -Phase post }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IsNotAEngine-${{ steps.ver.outputs.version }}
+          path: dist/*
+      - name: Publicar a versão
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

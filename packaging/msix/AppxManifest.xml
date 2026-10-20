@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Manifesto do pacote MSIX do IsNotAEngine (Microsoft Store).
+  Os valores @...@ são preenchidos por packaging/msix/build.ps1. Name e Publisher DEVEM ser os que o
+  Partner Center mostra em "Gerenciamento de produtos > Identidade do produto" (a Store assina o pacote).
+-->
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+         xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         IgnorableNamespaces="uap uap5 desktop rescap">
+  <Identity Name="@IDENTITY_NAME@" Publisher="@PUBLISHER@" Version="@VERSION@" ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>IsNotAEngine</DisplayName>
+    <PublisherDisplayName>@PUBLISHER_DISPLAY@</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Resources>
+    <Resource Language="pt-BR" />
+    <Resource Language="en-US" />
+  </Resources>
+  <Applications>
+    <Application Id="IsNotAEngine" Executable="IsNotAEngine.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="IsNotAEngine"
+                          Description="Engine nativa de wallpapers animados para Windows."
+                          BackgroundColor="transparent"
+                          Square150x150Logo="Assets\Square150x150Logo.png"
+                          Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- "Iniciar com o Windows": a chave Run do registro seria virtualizada no pacote (src/desktop/autostart.rs). -->
+        <desktop:Extension Category="windows.startupTask" Executable="IsNotAEngine.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="IsNotAEngineStartup" Enabled="false" DisplayName="IsNotAEngine" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <!-- Aplicativo Win32 completo: desenha atrás dos ícones da área de trabalho e usa WASAPI, WebView2 etc. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

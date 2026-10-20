@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="retint" content="#a6e3a1">
+<title>Terminal · Boot</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c11; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Boot de uma máquina Linux em loop: POST, kernel, serviços do systemd, login, shell, reboot. Só redesenha quando uma
+// linha muda (e o cursor pisca só nas fases ociosas). `?speed=8` acelera a linha do tempo (só para desenvolvimento).
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const QS = new URLSearchParams(location.search);
+const SPEED = Math.max(0.25, +QS.get('speed') || 1);
+const DEV = QS.has('speed');
+const FORCE = QS.get('force') || '';
+const isHidden = () => document.hidden && !DEV;
+const COL = { bg: '#0b0c11', t: '#cdd6f4', d: '#6c7086', g: '#a6e3a1', y: '#f9e2af', r: '#f38ba8', b: '#89b4fa', m: '#cba6f7', c: '#94e2d5' };
+
+const rnd = (() => { let a = (Date.now() % 4294967296) >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
+const pick = a => a[Math.floor(rnd() * a.length)];
+const jitter = (a, b) => a + rnd() * (b - a);
+const sleep = ms => new Promise(r => setTimeout(r, ms / SPEED));
+const visible = () => isHidden() ? new Promise(r => document.addEventListener('visibilitychange', function f() { if (!isHidden()) { document.removeEventListener('visibilitychange', f); r(); } })) : Promise.resolve();
+async function wait(ms) { await visible(); await sleep(ms); }
+
+const CORES = navigator.hardwareConcurrency || 8;
+const MEM_MB = Math.round((navigator.deviceMemory || 16) * 1024);
+const HOST = 'isnotaengine';
+const KERNEL = '6.12.' + (10 + Math.floor(rnd() * 30)) + '-isnot';
+
+const SERVICES = [
+  ['Created slice', 'system-modprobe.slice.'], ['Mounted', 'Huge Pages File System.'], ['Mounted', 'POSIX Message Queue File System.'],
+  ['Finished', 'Load Kernel Modules.'], ['Started', 'Journal Service.'], ['Finished', 'Coldplug All udev Devices.'],
+  ['Started', 'Rule-based Manager for Device Events and Files.'], ['Reached target', 'Local File Systems.'], ['Finished', 'Create Volatile Files and Directories.'],
+  ['Started', 'Network Name Resolution.'], ['Started', 'Network Manager.'], ['Reached target', 'Network.'], ['Started', 'D-Bus System Message Bus.'],
+  ['Started', 'Login Service.'], ['Started', 'Time & Date Service.'], ['Started', 'OpenSSH Daemon.'], ['Started', 'Docker Application Container Engine.'],
+  ['Started', 'PostgreSQL Database Server.'], ['Started', 'Cargo Registry Mirror (cache local).'], ['Started', 'Redis (só para dizer que tem).'],
+  ['Started', 'Serviço que ninguém sabe para que serve.'], ['Reached target', 'Multi-User System.'],
+];
+const JOKE_OK = ['Started', 'Cafeteira Inteligente (v2, ainda sem firmware).'], JOKE_WARN = 'cron: backup noturno (pulado, ninguém lembrou).';
+const FAILS = [
+  ['Falha ao iniciar', 'Sprint Planning.', 'dependência: tempo livre'],
+  ['Falha ao iniciar', 'Servidor de Staging (funciona na minha máquina).', 'exit-code: 0 (mas mentiu)'],
+  ['Falha ao iniciar', 'Motivação Matinal.', 'unit masked: segunda-feira'],
+];
+const POST_LOGO = [
+  '  ___      _  _       _       ___           _          ',
+  ' |_ _|___ | \\| |___ _| |_    /_\\ | ___ _ _ (_)_ _  ___ ',
+  '  | |(_-< | .` / _ \\  _|   / _ \\| / -_) ` \\| | \' \\/ -_)',
+  ' |___/__/ |_|\\_\\___/\\__|  /_/ \\_\\_\\___|_||_|_|_||_\\___|',
+];
+const FORTUNES = ['99 bugs no código. Corrige um, 127 bugs no código.', 'Se está funcionando, não mexe.', 'Um QA entra num bar e pede -1 cerveja. O bar quebra.',
+  'git blame: fui eu. Sempre fui eu.', 'Reiniciou? Limpou o cache? Culpou o DNS?', 'Deploy na sexta às 17h: coragem ou ingenuidade?', 'TODO: apagar este TODO.', 'Existem 10 tipos de pessoas: as que entendem binário e as que não.'];
+const COMMANDS = [
+  ['cargo run --release', ['    Finished `release` profile [optimized] target(s) in 0.31s', '     Running `target\\release\\IsNotAEngine.exe`', 'wallpaper: pronto, sem drama.']],
+  ['git log --oneline -3', ['967986b feat(wallpaper): Clock · Mono', '0b3f2c3 feat(terminal): pipeline de CI', 'ac68b91 fix(engine): recupera quando o Explorer destrói as janelas']],
+  ['uptime', [' 09:41:07 up 0 min,  1 user,  load average: 0,42, 0,10, 0,03']],
+  ['sudo rm -rf /', ['[sudo] senha para dev: ', 'dev não está no arquivo sudoers. Este incidente será relatado. (ao seu gato)']],
+];
+
+// ---------- estado e desenho ----------
+const lines = [];                   // { segs:[[texto, cor, negrito]] }
+let overlay = null;                 // linha ao vivo (barra de memória / senha / cursor)
+let cursorOn = false, cursorShown = true;
+let dirty = true;
+const T = (s, c = 't', b = false) => [s, c, b];
+const stamp = t => T('[' + t.toFixed(6).padStart(12) + '] ', 'd');
+function push(segs) { lines.push({ segs }); while (lines.length > 300) lines.shift(); dirty = true; }
+const ok = (what, extra = '') => push([T('[  ', 't'), T('OK', 'g', true), T('  ] ', 't'), T(what + extra)]);
+const bad = (what, why) => push([T('[', 't'), T('FALHOU', 'r', true), T('] ', 't'), T(what + ' '), T('(' + why + ')', 'r')]);
+
+let W = 0, H = 0, dpr = 1, fs = 16, cw = 9, lh = 20;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  fs = Math.max(13, Math.round(H / 46)); lh = Math.round(fs * 1.28);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.font = fs + 'px Consolas, "Cascadia Mono", "Courier New", monospace'; g.textRendering = 'optimizeSpeed';
+  cw = g.measureText('M').width; dirty = true;
+}
+addEventListener('resize', resize);
+
+function draw() {
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = COL.bg; g.fillRect(0, 0, W, H);
+  g.textBaseline = 'alphabetic';
+  const padX = Math.round(W * 0.03), padY = Math.round(H * 0.045);
+  const rows = Math.floor((H - padY * 2) / lh);
+  const all = overlay ? lines.concat([{ segs: overlay }]) : lines;
+  const view = all.slice(-rows);
+  let y = padY + lh - Math.round(lh * 0.28);
+  g.font = fs + 'px Consolas, "Cascadia Mono", "Courier New", monospace';
+  for (let i = 0; i < view.length; i++, y += lh) {
+    let x = padX;
+    for (const [s, c, b] of view[i].segs) {
+      g.fillStyle = COL[c] || COL.t;
+      if (b) g.font = 'bold ' + fs + 'px Consolas, "Cascadia Mono", "Courier New", monospace';
+      g.fillText(s, x, y);
+      if (b) g.font = fs + 'px Consolas, "Cascadia Mono", "Courier New", monospace';
+      x += s.length * cw;
+    }
+    if (overlay && i === view.length - 1 && cursorOn && cursorShown) { g.fillStyle = COL.t; g.fillRect(x + 1, y - fs + 2, Math.round(cw * 0.8), fs); }
+  }
+}
+function frame() { if (dirty && !isHidden()) { dirty = false; draw(); } requestAnimationFrame(frame); }
+setInterval(() => { if (cursorOn && !isHidden()) { cursorShown = !cursorShown; dirty = true; } }, 530);
+
+// ---------- fases ----------
+async function typeLine(prefix, text, cps) {
+  cursorOn = true;
+  for (let i = 0; i <= text.length; i++) {
+    overlay = prefix.concat([T(text.slice(0, i), 't')]); cursorShown = true; dirty = true;
+    await wait(1000 / cps * jitter(0.6, 1.6));
+  }
+  await wait(350);
+  lines.push({ segs: overlay }); overlay = null; cursorOn = false; dirty = true;
+}
+async function post() {
+  lines.length = 0; overlay = null;
+  await wait(500);
+  for (const l of POST_LOGO) { push([T(l, 'g', true)]); await wait(70); }
+  push([T('')]);
+  push([T('Boot Loader 2.04  ·  BIOS Date 10/13/26  ·  ', 'd'), T(CORES + ' núcleos lógicos', 'c')]);
+  await wait(400);
+  const steps = Math.floor(jitter(10, 14));
+  for (let i = 0; i <= steps; i++) {
+    const mb = Math.round(MEM_MB * i / steps);
+    overlay = [T('Teste de memória: ', 't'), T(String(mb).padStart(6) + ' MB', 'y'), T(' / ' + MEM_MB + ' MB  ', 'd'), T('[' + '#'.repeat(Math.round(i / steps * 24)).padEnd(24, '.') + ']', 'g')];
+    dirty = true; await wait(jitter(60, 140));
+  }
+  lines.push({ segs: [T('Teste de memória: ', 't'), T(MEM_MB + ' MB  OK', 'g', true)] }); overlay = null;
+  push([T('Detectando discos... ', 't'), T('NVMe0 (512 GB)', 'c')]); await wait(500);
+  push([T('Iniciando ' + KERNEL + '...', 't')]); await wait(700);
+}
+async function kernel() {
+  let t = 0.000001;
+  const k = [
+    `Linux version ${KERNEL} (dev@${HOST}) (gcc 14.2, ld 2.43) #1 SMP PREEMPT_DYNAMIC`,
+    `Command line: BOOT_IMAGE=/vmlinuz-${KERNEL} root=UUID=4f2a-9c1e ro quiet`,
+    `x86/fpu: Supporting XSAVE feature 0x001: 'x87 floating point registers'`,
+    `BIOS-provided physical RAM map: ${MEM_MB} MB utilizáveis`,
+    `smpboot: Allowing ${CORES} CPUs, 0 hotplug CPUs`,
+    `Memory: ${(MEM_MB / 1024).toFixed(1)}G/${(MEM_MB / 1024 + 0.4).toFixed(1)}G available`,
+    `rcu: Hierarchical RCU implementation.`,
+    `clocksource: tsc: mask: 0xffffffffffffffff, max_cycles: 0x2a4e2c8e3b2`,
+    `NET: Registered PF_INET protocol family`,
+    `nvme nvme0: 16/0/0 default/read/poll queues`,
+    `EXT4-fs (nvme0n1p2): mounted filesystem with ordered data mode`,
+    `usb 1-3: new high-speed USB device number 2 using xhci_hcd`,
+    `input: Teclado Mecânico (o barulhento) as /devices/virtual/input/input7`,
+    `random: crng init done`,
+  ];
+  for (const m of k) { t += jitter(0.002, 0.18); push([stamp(t), T(m)]); await wait(jitter(35, 120)); }
+  return t;
+}
+async function services() {
+  const list = SERVICES.slice();
+  if (rnd() < 0.5) list.splice(8 + Math.floor(rnd() * 8), 0, JOKE_OK);
+  for (const [verb, what] of list) {
+    const doFail = FORCE === 'fail' && verb === 'Started' && what.startsWith('Redis') || (!FORCE && rnd() < 0.05 && verb === 'Started');
+    if (doFail) {
+      const f = pick(FAILS);
+      bad(f[0] + ' ' + f[1], f[2]); await wait(500);
+      push([T('Veja ', 'd'), T('systemctl status', 'b'), T(' para detalhes.', 'd')]); await wait(500);
+      continue;
+    }
+    if (verb === 'Started' && rnd() < 0.4) {
+      for (const sp of ['|', '/', '-', '\\', '|']) { overlay = [T('[ ', 't'), T(sp, 'y', true), T(' ] ', 't'), T('Iniciando ' + what.replace(/\.$/, '') + '...', 'd')]; dirty = true; await wait(jitter(70, 120)); }
+      overlay = null;
+    }
+    ok(verb + ' ' + what); await wait(jitter(30, 150));
+  }
+  if (rnd() < 0.4) { push([T('[', 't'), T('AVISO', 'y', true), T('] ', 't'), T(JOKE_WARN, 'y')]); await wait(450); }
+}
+async function login() {
+  await wait(500);
+  push([T('')]);
+  push([T(HOST + ' (' + KERNEL + ') tty1', 'd')]); push([T('')]);
+  await typeLine([T(HOST + ' login: ', 't')], 'dev', 7);
+  cursorOn = true;
+  for (let i = 0; i <= 10; i++) { overlay = [T('Password: ', 't'), T('*'.repeat(i), 'd')]; cursorShown = true; dirty = true; await wait(jitter(100, 210)); }
+  await wait(450); lines.push({ segs: [T('Password: ', 't')] }); overlay = null; cursorOn = false;
+  push([T('')]);
+  push([T('Bem-vindo ao ', 't'), T('IsNotAEngine Linux', 'g', true), T(' (' + KERNEL + ')', 'd')]);
+  push([T('')]);
+  push([T(' Sistema:  ', 'd'), T('carga 0,42   processos 187   memória ' + Math.round(MEM_MB * 0.18) + ' MB / ' + MEM_MB + ' MB')]);
+  push([T(' Núcleos:  ', 'd'), T(String(CORES), 'c'), T('   uptime 0 min   usuários 1', 'd')]);
+  push([T('')]);
+  push([T('fortune: ', 'y', true), T(pick(FORTUNES))]);
+  push([T('')]);
+  await wait(900);
+}
+async function shell() {
+  const prompt = [T('dev@' + HOST, 'g', true), T(':', 't'), T('~/projeto', 'b', true), T('$ ', 't')];
+  const cmds = COMMANDS.slice().sort(() => rnd() - 0.5).slice(0, 2);
+  for (const [cmd, out] of cmds) {
+    await typeLine(prompt, cmd, 11);
+    for (const o of out) { push([T(o, o.startsWith('dev não') ? 'r' : 't')]); await wait(jitter(160, 380)); }
+    await wait(900);
+  }
+  // espera ociosa com o cursor piscando
+  cursorOn = true; overlay = prompt; dirty = true;
+  await wait(jitter(9000, 14000));
+  cursorOn = false; overlay = null;
+}
+async function shutdown() {
+  push([T('')]);
+  push([T('dev@' + HOST, 'g', true), T(':', 't'), T('~/projeto', 'b', true), T('$ ', 't'), T('sudo reboot')]); await wait(700);
+  for (const s of ['Parado Docker Application Container Engine.', 'Parado PostgreSQL Database Server.', 'Parado Login Service.', 'Reached target Shutdown.']) { ok(s); await wait(jitter(200, 380)); }
+  push([T('reboot: Restarting system', 'd')]); await wait(1400);
+}
+(async function main() {
+  resize(); requestAnimationFrame(frame);
+  for (;;) {
+    await post(); const t = await kernel(); void t; await services(); await login(); await shell(); await shutdown();
+  }
+})();
+</script>
+</body>
+</html>
